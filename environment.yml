@@ -1,0 +1,16 @@
+name: fmri-imagery-context
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - scipy
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - jupyterlab
+  - pip
+  - pip:
+      - nilearn
+      - sentence-transformers
+      - openai   # LLM 라벨링에 사용할 경우; 로컬 모델만 쓴다면 제거

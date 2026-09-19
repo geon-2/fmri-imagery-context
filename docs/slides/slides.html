@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>떠올린 장면에 남는 맥락</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EDF2; --paper:#FFFFFF; --ink:#16213A; --muted:#5B6679; --line:#D9DEE6; --soft:#F3F5F8;
+  --vision:#2B6CB0; --imagery:#7B4FD6; --memory:#0F8F7F;
+  --font:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A0F1A; --paper:#141B2A; --ink:#E6EAF2; --muted:#9AA4B6; --line:#2A3347; --soft:#1B2436;
+    --vision:#5B9BE0; --imagery:#A585F0; --memory:#3CC2AE;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A0F1A; --paper:#141B2A; --ink:#E6EAF2; --muted:#9AA4B6; --line:#2A3347; --soft:#1B2436;
+  --vision:#5B9BE0; --imagery:#A585F0; --memory:#3CC2AE;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);overflow:hidden;-webkit-font-smoothing:antialiased;word-break:keep-all;overflow-wrap:break-word}
+
+/* stage */
+#viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#stage{width:1600px;height:900px;position:relative;transform-origin:center center;flex:none}
+.slide{position:absolute;inset:0;background:var(--paper);padding:84px 110px 110px;display:none;flex-direction:column;border-radius:6px;box-shadow:0 1px 2px rgba(22,33,58,.08)}
+.slide.active{display:flex}
+.slide h2{font-size:58px;font-weight:700;letter-spacing:-.025em;line-height:1.1;margin-bottom:52px}
+:where(.slide) p,:where(.slide) li{font-size:30px;line-height:1.5}
+.muted{color:var(--muted)}
+.source{position:absolute;left:110px;bottom:72px;font-size:18px;color:var(--muted)}
+.body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:36px}
+
+/* footer phase track */
+.track{position:absolute;right:110px;bottom:44px;display:flex;gap:28px;font-size:17px;color:var(--muted)}
+.track span{padding-top:10px;border-top:3px solid var(--line)}
+.track span.on{color:var(--ink);border-top-color:var(--ink);font-weight:500}
+.pageno{position:absolute;left:110px;bottom:40px;font-size:17px;color:var(--muted)}
+
+/* colors as meaning */
+.v{color:var(--vision)} .i{color:var(--imagery)} .m{color:var(--memory)}
+
+/* title slide */
+.cover{justify-content:flex-end;padding-bottom:150px}
+.cover h1{font-size:80px;font-weight:700;letter-spacing:-.035em;line-height:1.02}
+.cover h1 .line2{display:block;color:var(--imagery)}
+.cover .sub{font-size:34px;font-weight:400;margin-top:40px;color:var(--ink);max-width:1200px}
+.cover .meta{font-size:22px;color:var(--muted);margin-top:28px}
+.cover svg{position:absolute;right:110px;top:90px}
+
+/* rows */
+.rows{display:grid;grid-template-columns:200px 1fr;row-gap:34px;column-gap:48px;align-items:baseline}
+.rows dt{font-size:26px;color:var(--muted);font-weight:500}
+.rows dd{font-size:34px;line-height:1.45}
+.rows dd small{display:block;font-size:24px;color:var(--muted);margin-top:6px}
+
+/* flow diagram */
+.flow{display:flex;align-items:center;gap:22px}
+.node{border:2px solid var(--line);border-radius:14px;padding:26px 30px;min-width:210px;text-align:center}
+.node b{display:block;font-size:30px;font-weight:700}
+.node span{display:block;font-size:22px;color:var(--muted);margin-top:6px}
+.node.core{border-color:var(--ink)}
+.arrow{font-size:40px;color:var(--muted)}
+.lead{font-size:44px;font-weight:500;letter-spacing:-.015em;line-height:1.35;max-width:1250px}
+
+/* stats */
+.meter{position:relative;height:18px;background:var(--soft);border-radius:9px;width:1100px;margin-top:22px}
+.meter .fill{position:absolute;left:0;top:0;bottom:0;border-radius:9px;background:var(--imagery)}
+.meter .chance{position:absolute;top:-14px;bottom:-14px;width:2px;background:var(--ink)}
+.meter-labels{position:relative;width:1100px;height:40px;font-size:22px;color:var(--muted)}
+.meter-labels span{position:absolute;top:10px;transform:translateX(-50%)}
+.stat{font-size:30px}
+.stat b{font-size:64px;font-weight:700;letter-spacing:-.02em;margin-right:14px}
+
+/* two columns */
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:80px}
+.cols h3{font-size:30px;font-weight:700;margin-bottom:16px}
+.cols p{font-size:28px}
+.analogy{font-size:30px;padding-left:28px;border-left:4px solid var(--imagery)}
+
+/* idea */
+.idea{display:grid;grid-template-columns:760px 1fr;gap:60px;align-items:center}
+.steps{list-style:none;display:flex;flex-direction:column;gap:34px}
+.steps li{display:grid;grid-template-columns:56px 1fr;font-size:32px;line-height:1.4}
+.steps li i{font-style:normal;font-weight:700;color:var(--muted)}
+
+/* RQ */
+.rq{display:flex;flex-direction:column;gap:40px}
+.rq div{display:grid;grid-template-columns:130px 1fr;align-items:baseline}
+.rq b{font-size:30px}
+.rq p{font-size:34px}
+.rq .key p{font-weight:500}
+.rq .key b{color:var(--imagery)}
+
+/* table */
+table{border-collapse:collapse;width:100%}
+th{font-size:20px;font-weight:500;color:var(--muted);text-align:left;padding:0 18px 14px;border-bottom:2px solid var(--ink)}
+td{font-size:22px;line-height:1.3;padding:8px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.c{text-align:center} th.c{text-align:center}
+table.big td{font-size:27px;padding:13px 16px}
+table.big th{font-size:22px}
+tr.ours td{font-weight:700;border-bottom:none;background:var(--soft)}
+.dot{display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid var(--ink);vertical-align:-2px}
+.dot.full{background:var(--ink)}
+.dot.half{background:linear-gradient(90deg,var(--ink) 50%,transparent 50%)}
+.dot.none{border-color:var(--line)}
+.legend{font-size:18px;color:var(--muted);display:flex;gap:26px;margin-top:14px}
+.tag{font-size:16px;color:var(--muted);font-weight:400;display:block}
+
+/* compare */
+.cmp{display:grid;grid-template-columns:170px 1fr 60px 1.2fr;row-gap:38px;column-gap:24px;align-items:center}
+.cmp .k{font-size:26px;color:var(--muted);font-weight:500}
+.cmp .old{font-size:30px;color:var(--muted)}
+.cmp .to{font-size:32px;color:var(--muted);text-align:center}
+.cmp .new{font-size:32px;font-weight:700}
+
+/* dataset */
+.data{display:grid;grid-template-columns:1fr 1fr;gap:56px}
+.card{border-top:4px solid var(--ink);padding-top:26px}
+.card.v{border-top-color:var(--vision)} .card.i{border-top-color:var(--imagery)}
+.card h3{font-size:38px;font-weight:700;color:var(--ink)}
+.card .role{font-size:24px;margin:6px 0 24px}
+.card ul{list-style:none;display:flex;flex-direction:column;gap:12px}
+.card li{font-size:27px;color:var(--ink)}
+.card li span{color:var(--muted)}
+
+/* preprocess */
+.pre{display:grid;grid-template-columns:200px 1fr;row-gap:40px;column-gap:40px}
+.pre dt{font-size:30px;font-weight:700}
+.pre dd{font-size:28px;line-height:1.5}
+.chips{display:flex;gap:14px;flex-wrap:wrap}
+.chip{border:2px solid var(--line);border-radius:999px;padding:6px 20px;font-size:24px}
+.chip.v{border-color:var(--vision);color:var(--vision)} .chip.m{border-color:var(--memory);color:var(--memory)}
+.texts{display:grid;grid-template-columns:190px 1fr;row-gap:10px;font-size:26px}
+.texts span:nth-child(odd){color:var(--muted)}
+.texts .ctx{color:var(--imagery);font-weight:500}
+
+/* pipeline */
+.pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:22px}
+.pipe div{border-top:4px solid var(--line);padding-top:22px}
+.pipe div.hl{border-top-color:var(--imagery)}
+.pipe i{font-style:normal;font-size:22px;color:var(--muted)}
+.pipe b{display:block;font-size:34px;margin:6px 0 12px}
+.pipe p{font-size:23px;line-height:1.45}
+
+/* tech */
+.tech{display:grid;grid-template-columns:1fr 1fr;gap:48px 80px}
+.tech h3{font-size:30px;margin-bottom:14px}
+.tech p{font-size:26px;color:var(--muted);line-height:1.55}
+
+/* eval */
+.metrics{display:flex;flex-direction:column;gap:36px}
+.metrics div{display:grid;grid-template-columns:520px 1fr;align-items:baseline}
+.metrics b{font-size:32px}
+.metrics p{font-size:28px;color:var(--muted)}
+.rule{font-size:26px;padding:22px 28px;background:var(--soft);border-radius:10px}
+
+/* schedule */
+.gantt{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+.wk{border-radius:10px;padding:22px 20px;background:var(--soft);min-height:250px;display:flex;flex-direction:column;gap:10px}
+.wk i{font-style:normal;font-size:22px;color:var(--muted)}
+.wk p{font-size:24px;line-height:1.4}
+.wk .gate{margin-top:auto;font-size:20px;font-weight:700;color:var(--imagery)}
+
+/* risk */
+.risk{display:grid;grid-template-columns:1fr 1fr;gap:70px}
+.risk h3{font-size:28px;color:var(--muted);font-weight:500;margin-bottom:20px}
+.risk dl{display:grid;grid-template-columns:130px 1fr;row-gap:20px}
+.risk dt{font-size:26px;font-weight:700}
+.risk dd{font-size:26px;line-height:1.45}
+
+/* outputs */
+.outs{display:grid;grid-template-columns:repeat(4,1fr);gap:28px}
+.outs div{border:2px solid var(--line);border-radius:14px;padding:30px 26px;min-height:260px}
+.outs b{display:block;font-size:30px;margin-bottom:14px}
+.outs p{font-size:24px;color:var(--muted);line-height:1.45}
+
+/* summary */
+.sum{display:grid;grid-template-columns:150px 1fr;row-gap:34px;align-items:baseline}
+.sum dt{font-size:28px;color:var(--muted)}
+.sum dd{font-size:40px;font-weight:500;letter-spacing:-.01em}
+.thanks{font-size:28px;color:var(--muted);margin-top:30px}
+
+
+/* model bars */
+.bars{display:flex;flex-direction:column;gap:18px;width:1150px}
+.bar{display:grid;grid-template-columns:240px 1fr 120px;align-items:center;gap:20px}
+.bar .name{font-size:26px}
+.bar .track2{position:relative;height:30px;background:var(--soft);border-radius:6px}
+.bar .fill2{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--line)}
+.bar.hl .fill2{background:var(--imagery)}
+.bar .val{font-size:28px;font-weight:700;text-align:right}
+.bar.hl .name,.bar.hl .val{color:var(--imagery)}
+.bar .chance2{position:absolute;top:-8px;bottom:-8px;width:2px;background:var(--ink)}
+.bar-note{display:grid;grid-template-columns:240px 1fr 120px;gap:20px;font-size:20px;color:var(--muted)}
+.bar-note span:nth-child(2){position:relative}
+.bar-note b{position:absolute;left:50%;transform:translateX(-50%);font-weight:400}
+/* target roles */
+.texts3{display:grid;grid-template-columns:190px 1fr 230px;row-gap:12px;column-gap:24px;font-size:25px;align-items:baseline}
+.texts3 .lab{color:var(--muted)}
+.texts3 .role3{font-size:21px;color:var(--muted)}
+.texts3 .ctx{color:var(--imagery);font-weight:500}
+.texts3 .role3.key{color:var(--imagery);font-weight:700}
+
+
+/* why context */
+.why{display:grid;grid-template-columns:repeat(2,1fr);gap:80px}
+.why h3{font-size:32px;margin-bottom:14px}
+.why p{font-size:25px;line-height:1.5}
+.why .ev{display:block;font-size:19px;color:var(--muted);margin-top:14px;line-height:1.45}
+.rq .tagq{display:block;font-size:19px;font-weight:500;color:var(--muted);margin-top:4px}
+
+
+/* labeling */
+.dims{width:100%}
+.dims td{font-size:22px}
+.dims td:first-child{font-weight:700;width:200px}
+.dims td:last-child{color:var(--muted);font-size:19px;width:440px;white-space:nowrap}
+.proc{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:22px;margin-top:22px}
+.proc span{border:2px solid var(--line);border-radius:999px;padding:6px 18px}
+.proc span.k{border-color:var(--imagery);color:var(--imagery);font-weight:500}
+.proc i{font-style:normal;color:var(--muted)}
+.tpl{font-size:22px;color:var(--muted);margin-top:16px}
+/* overview */
+.ov{display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
+.ov div{border-top:4px solid var(--line);padding-top:22px}
+.ov div.hl{border-top-color:var(--imagery)}
+.ov i{font-style:normal;font-size:22px;color:var(--muted)}
+.ov b{display:block;font-size:32px;margin:6px 0 12px}
+.ov p{font-size:24px;line-height:1.45}
+.ov small{display:block;font-size:19px;color:var(--muted);margin-top:10px}
+.tools{display:grid;grid-template-columns:150px 1fr;row-gap:10px;font-size:23px}
+.tools span:nth-child(odd){color:var(--muted)}
+
+.defn{border-left:4px solid var(--imagery);padding:4px 0 4px 26px;margin-bottom:30px}
+.defn p{font-size:27px;line-height:1.5}
+/* notes */
+.notes{display:none}
+#notesPanel{position:fixed;left:0;right:0;bottom:0;height:34vh;background:var(--paper);border-top:1px solid var(--line);padding:22px 40px 30px;overflow:auto;display:none;font-size:18px;line-height:1.75;color:var(--ink)}
+#notesPanel h4{font-size:14px;font-weight:500;color:var(--muted);margin-bottom:8px}
+body.show-notes #notesPanel{display:block}
+
+/* controls */
+#controls{position:fixed;right:16px;top:14px;display:flex;gap:8px;z-index:5}
+#controls button{font:inherit;font-size:14px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+#controls button:focus-visible,#nav button:focus-visible{outline:2px solid var(--imagery);outline-offset:2px}
+#nav{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;display:flex;gap:8px;z-index:5}
+body.show-notes #nav{bottom:calc(34vh + 12px)}
+#nav button{font:inherit;font-size:15px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 16px;cursor:pointer}
+@media (prefers-reduced-motion: no-preference){
+  .slide.active{animation:in .25s ease-out}
+  @keyframes in{from{opacity:.4}to{opacity:1}}
+}
+@media print{
+  body{overflow:visible;background:#fff}
+  #controls,#nav,#notesPanel{display:none!important}
+  #viewport{position:static;display:block}
+  #stage{transform:none!important;width:1600px;height:auto}
+  .slide{display:flex!important;position:relative;height:900px;page-break-after:always;box-shadow:none;border-radius:0}
+}
+</style>
+</head>
+<body>
+<div id="controls">
+  <button id="btnNotes" aria-pressed="false">대본 (N)</button>
+  <button id="btnFull">전체화면 (F)</button>
+</div>
+<div id="viewport"><div id="stage">
+
+<!-- 1 -->
+<section class="slide cover" data-phase="">
+  <svg width="420" height="300" viewBox="0 0 420 300" aria-hidden="true">
+    <g fill="var(--vision)" opacity=".55">
+      <circle cx="80" cy="120" r="7"/><circle cx="120" cy="80" r="5"/><circle cx="150" cy="150" r="6"/><circle cx="60" cy="190" r="5"/><circle cx="110" cy="210" r="7"/><circle cx="170" cy="100" r="4"/><circle cx="40" cy="110" r="4"/><circle cx="140" cy="240" r="5"/><circle cx="190" cy="190" r="6"/><circle cx="90" cy="160" r="4"/>
+    </g>
+    <line x1="230" y1="150" x2="400" y2="150" stroke="var(--imagery)" stroke-width="4"/>
+    <line x1="315" y1="70" x2="315" y2="230" stroke="var(--imagery)" stroke-width="4" opacity=".45"/>
+    <g fill="var(--imagery)"><circle cx="270" cy="150" r="8"/><circle cx="350" cy="150" r="8"/><circle cx="315" cy="110" r="6" opacity=".6"/></g>
+  </svg>
+  <h1>Perception fMRI 기반 저차원 context 축의 mental imagery 전이 분석</h1>
+  <p class="meta">소프트웨어융합캡스톤디자인 2026년 2학기</p>
+  <aside class="notes">시작하겠습니다. 저는 "Perception fMRI 기반 저차원 context 축의 mental imagery 전이 분석"을 주제로 프로젝트를 진행할 예정입니다.</aside>
+</section>
+
+<!-- 2 -->
+<!-- <section class="slide" data-phase="문제 정의">
+  <h2>주제 변경</h2>
+  <div class="body">
+    <dl class="rows">
+      <dt>기존</dt><dd>자연 장면 fMRI의 relation 표현 분석<small>Nested RSA로 relation의 추가 설명력 검증</small></dd>
+      <dt>한계</dt><dd>선행연구와 겹침, "객체 정보의 재포장" 반론<small>다수 relation이 객체 종류에 거의 결정됨</small></dd>
+      <dt>전환</dt><dd><span class="i">떠올린 장면</span>의 해석으로 질문 이동<small>기존 NSD·scene graph 작업은 통제 변수로 재사용</small></dd>
+    </dl>
+  </div>
+  <aside class="notes">먼저 주제가 바뀐 이유부터 말씀드리겠습니다.
+원래는 자연 장면을 볼 때 뇌 반응에 객체 사이의 관계 정보가 따로 남는지를 nested RSA로 분석하려 했습니다.
+문헌과 초기 데이터를 검증하면서 두 가지 문제가 보였습니다. 첫째, 관계를 구조적으로 해독한 NEURONA 같은 최근 연구와 겹치는 부분이 컸습니다. 둘째, 결과가 나오더라도 "그건 결국 객체 정보를 다시 포장한 것 아니냐"는 반론을 피하기 어려웠습니다. 실제로 데이터 점검에서도 wearing, riding, holding 같은 많은 관계가 객체 종류에 거의 결정되었습니다.
+그래서 질문을 "본 장면"에서 "떠올린 장면"으로 옮겼습니다. 다만 지금까지 한 NSD와 scene graph 정리 작업은 이번 연구에서 통제 변수로 그대로 활용합니다.</aside>
+</section> -->
+
+<!-- 3 -->
+<section class="slide" data-phase="문제 정의">
+  <h2>Brain decoding</h2>
+  <div class="body">
+    <div class="flow">
+      <div class="node"><b>fMRI</b><span>뇌 활동</span></div>
+      <div class="arrow">→</div>
+      <div class="node core"><b>Decoder</b><span>번역기</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>Embedding</b><span>의미 좌표</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>복원·검색</b><span>이미지, 의미</span></div>
+    </div>
+    <dl class="rows" style="margin-top:30px">
+      <dt class="v">Perception</dt><dd>눈으로 <b>본</b> 장면</dd>
+      <dt class="i">Imagery</dt><dd>머릿속으로 <b>떠올린</b> 장면</dd>
+    </dl>
+  </div>
+  <aside class="notes">설명에 앞서 배경을 짧게 말씀드리겠습니다.
+아시다시피 Brain decoding은 뇌 활동을 AI 모델이 이해하는 표현으로 번역하는 task입니다. fMRI 신호를 decoder에 넣으면 CLIP embedding 같은 representation이 나오고, 이를 확장해 피험자가 본 이미지나 텍스트로 복원할 수도 있습니다.
+여기서 두 상황을 구분합니다. 실제로 눈으로 본 장면은 perception, 머릿속으로 떠올린 장면은 imagery입니다.</aside>
+</section>
+
+<!-- 4 -->
+<section class="slide" data-phase="문제 정의">
+  <h2>문제 정의</h2>
+  <div class="body">
+    <p class="lead">본 장면을 잘 읽는 decoder가 <span class="i">떠올린 장면</span>도 잘 읽지는 않는다</p>
+    <div class="bars" role="img" aria-label="NSD-Imagery imagery 복원 사람 평가: Brain Diffuser 73.95%, MindEye1 73.00%, MindEye2 56.96%, 우연 수준 50%">
+      <div class="bar"><span class="name">Brain Diffuser</span><span class="track2"><span class="fill2" style="width:73.95%"></span><span class="chance2" style="left:50%"></span></span><span class="val">73.95%</span></div>
+      <div class="bar"><span class="name">MindEye1</span><span class="track2"><span class="fill2" style="width:73%"></span><span class="chance2" style="left:50%"></span></span><span class="val">73.00%</span></div>
+      <div class="bar hl"><span class="name">MindEye2</span><span class="track2"><span class="fill2" style="width:56.96%"></span><span class="chance2" style="left:50%"></span></span><span class="val">56.96%</span></div>
+      <div class="bar-note"><span></span><span><b>우연 50%</b></span><span></span></div>
+    </div>
+    <p class="muted">MindEye2: 본 장면에서 강력, imagery 단순 도형에서는 50.21%</p>
+  </div>
+  <p class="source">Imagery 복원 사람 평가, Kneeland et al., NSD-Imagery, CVPR 2025</p>
+  <aside class="notes">문제는 여기서 시작합니다. 최근 fMRI decoder들은 본 장면은 비교적 잘 복원하지만, 떠올린 장면에서는 성능이 떨어지고, 그 정도도 모델마다 크게 다릅니다.
+NSD-Imagery 벤치마크에서, 본 장면 복원에서 강력했던 MindEye2는 imagery 복원 사람 평가에서 56.96%로 무작위 기준선 50%보다 6.96%포인트 높은 데 그쳤고, 단순 도형에서는 50.21%였습니다. 반면 Brain Diffuser와 MindEye1은 각각 73.95%, 73.00%였습니다.
+벤치마크 저자들도 정리했듯, 본 장면을 잘 읽는 decoder가 떠올린 장면도 잘 읽는다는 보장은 없습니다.</aside>
+</section>
+
+<!-- 5 -->
+<section class="slide" data-phase="문제 정의">
+  <h2>원인</h2>
+  <div class="body">
+    <div class="cols">
+      <div>
+        <h3>신호</h3>
+        <p>Imagery는 낮은 SNR, 더 적은 signal dimension</p>
+        <p class="muted" style="margin-top:14px">초기 시각피질에서 낮은 공간 해상도, 넓은 receptive field</p>
+      </div>
+      <div>
+        <h3>Target 표현</h3>
+        <p>CLIP embedding, diffusion latent 등 <b>고차원 시각 표현</b>을 직접 예측</p>
+        <p class="muted" style="margin-top:14px">약한 신호로는 모든 세부 방향을 복원하기 어려움</p>
+      </div>
+    </div>
+    <p class="analogy">MIRAGE: 거친 이미지 특징 + 텍스트 의미를 함께 쓰면 imagery에 더 잘 일반화</p>
+  </div>
+  <p class="source">Kneeland et al., CVPR 2025 / MIRAGE, PLOS Comput Biol 2025</p>
+  <aside class="notes">원인은 크게 두 가지입니다.
+첫째는 신호입니다. NSD-Imagery 분석에 따르면 imagery는 perception보다 SNR, 즉 신호 대 잡음비가 낮고, 더 적은 signal dimension을 쓰며, 초기 시각피질에서 공간 해상도가 낮고 receptive field가 넓습니다. 본 장면의 흐린 복사본이라기보다, 더 압축되고 저해상도인 형태에 가깝습니다.
+둘째는 decoder가 맞혀야 하는 표현입니다. 기존 decoder는 CLIP embedding이나 diffusion latent 같은 고차원 시각 표현을 직접 예측합니다. 신호가 강한 본 장면에서는 괜찮지만, 약한 imagery 신호로는 모든 세부 방향을 안정적으로 맞히기 어렵습니다.
+MIRAGE 연구가 이를 보여 줍니다. 목격자의 흐릿한 기억으로 몽타주를 그릴 때, 눈썹 모양 같은 세부는 흔들려도 "안경 쓴 중년 남성" 같은 설명은 비교적 정확합니다. MIRAGE도 세밀한 이미지 표현 하나 대신 거친 이미지 특징과 텍스트 의미를 함께 써서 떠올린 장면에서 더 잘 작동했습니다. 흐릿한 신호일수록 굵직한 의미를 읽는 편이 유리하다는 것, 이것이 저희 아이디어의 출발점입니다.</aside>
+</section>
+
+<!-- 6 -->
+<section class="slide" data-phase="해결 방법">
+  <h2>핵심 아이디어</h2>
+  <div class="body">
+    <div class="idea">
+      <svg width="760" height="460" viewBox="0 0 760 460" role="img" aria-label="고차원 perception 표현에서 저차원 context 축을 찾아 imagery를 읽는 개념도">
+        <ellipse cx="200" cy="230" rx="170" ry="190" fill="none" stroke="var(--vision)" stroke-width="2" stroke-dasharray="6 6"/>
+        <g fill="var(--vision)" opacity=".6">
+          <circle cx="140" cy="140" r="8"/><circle cx="210" cy="110" r="6"/><circle cx="260" cy="190" r="7"/><circle cx="120" cy="230" r="6"/><circle cx="190" cy="260" r="9"/><circle cx="270" cy="290" r="6"/><circle cx="150" cy="320" r="7"/><circle cx="220" cy="350" r="5"/><circle cx="100" cy="300" r="5"/><circle cx="240" cy="230" r="5"/><circle cx="170" cy="190" r="5"/><circle cx="300" cy="240" r="4"/>
+        </g>
+        <text x="200" y="455" text-anchor="middle" font-size="22" fill="var(--vision)" font-family="inherit">Perception 표현 (고차원)</text>
+        <path d="M 390 230 L 470 230" stroke="var(--muted)" stroke-width="3" marker-end="url(#ah)"/>
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker></defs>
+        <line x1="500" y1="230" x2="740" y2="230" stroke="var(--imagery)" stroke-width="5"/>
+        <line x1="620" y1="120" x2="620" y2="340" stroke="var(--imagery)" stroke-width="5" opacity=".5"/>
+        <g fill="var(--imagery)"><circle cx="545" cy="230" r="11"/><circle cx="690" cy="230" r="11"/><circle cx="620" cy="165" r="9" opacity=".7"/></g>
+        <text x="620" y="400" text-anchor="middle" font-size="22" fill="var(--imagery)" font-family="inherit">Context 축 k개</text>
+        <circle cx="620" cy="60" r="18" fill="none" stroke="var(--memory)" stroke-width="3"/>
+        <text x="650" y="67" font-size="22" fill="var(--memory)" font-family="inherit">기억 영역</text>
+        <line x1="620" y1="80" x2="620" y2="112" stroke="var(--memory)" stroke-width="3" stroke-dasharray="4 4"/>
+      </svg>
+      <ol class="steps">
+        <li><i>1</i><span>Perception fMRI에서 뇌가 실제로 쓰는 <span class="i">저차원 context 축</span>을 찾는다</span></li>
+        <li><i>2</i><span>시각피질 + <span class="m">기억 영역</span> 신호로 imagery를 그 축 위에서 읽는다</span></li>
+      </ol>
+    </div>
+  </div>
+  <aside class="notes">그래서 아이디어는 두 단계입니다.
+첫째, 본 장면의 fMRI에서 뇌가 실제로 쓰는 적은 수의 맥락 축을 찾습니다. 그림의 파란 점 구름이 본 장면의 복잡한 표현이고, 보라색 축이 imagery까지 살아남을 것으로 기대하는 축입니다.
+둘째, 떠올린 장면을 그 축 위에서 읽습니다. 이때 시각피질에 더해 기억 관련 영역도 봅니다. NSD-Imagery의 imagery는 외워 둔 장면을 기억에서 꺼내는 과정이기 때문입니다.</aside>
+</section>
+
+<section class="slide" data-phase="해결 방법">
+  <h2>Context 축</h2>
+  <div class="body">
+    <div class="why">
+      <div><h3>Imagery에 남는 정보</h3><p>세부 시각 정보보다 굵직한 의미가 상대적으로 덜 손실</p><span class="ev">Breedlove 2020, Kneeland 2025, MIRAGE 2025</span></div>
+      <div><h3>기억에 남는 정보</h3><p>장면 기억은 세부보다 요지와 주변 맥락 중심</p><span class="ev">Steel 2021·2023: 장소 기억 영역의 맥락 표상</span></div>
+    </div>
+    <p class="analogy">저차원인 이유: imagery는 perception보다 더 적은 차원을 사용</p>
+  </div>
+  <p class="source">Saha Roy et al., bioRxiv 2025</p>
+  <aside class="notes">그렇다면 왜 맥락이고, 왜 축일까요.
+맥락은 두 가지 면에서 남기 쉬운 정보입니다. 떠올린 장면에서는 초기 시각피질의 세부 정보가 크게 약해지는 반면 고수준 의미 정보는 덜 손실되고, MIRAGE에서 텍스트 의미가 도움이 된 것도 같은 이유입니다. 또 장면 기억은 픽셀 세부보다 "바닷가의 여가 활동" 같은 요지와 주변 맥락 중심으로 남고, 장소 기억 영역이 시야 밖 맥락까지 표상한다는 연구도 있습니다.
+저차원으로 두는 것은, imagery가 적어도 초기 시각피질에서는 perception보다 적은 차원을 쓴다는 결과를 동기로 삼은 것입니다. 약한 신호로 답할 수 있는 질문이 적다면 그 수에 맞춰 묻자는 것이고, 실제 축 개수는 데이터로 정합니다.</aside>
+</section>
+
+<!-- 7 -->
+<section class="slide" data-phase="해결 방법">
+  <h2>연구 질문</h2>
+  <div class="body">
+    <div class="rq">
+      <div><b>RQ1</b><p>Object 정보를 넘어, 뇌와 context embedding이 공유하는 저차원 축이 있는가<span class="tagq">사전 확인 (perception)</span></p></div>
+      <div class="key"><b>RQ2</b><p>그 뇌 정렬 축은 같은 차원의 뇌 정보 없는 축보다 imagery로 더 잘 전이되는가<span class="tagq">주 가설 (시각피질)</span></p></div>
+      <div><b>RQ3</b><p><span class="m">기억 영역</span>을 더하면 추가 이득이 있는가<span class="tagq">추가 실험</span></p></div>
+    </div>
+  </div>
+  <aside class="notes">연구 질문은 세 가지이고, 무엇이 효과를 냈는지 가릴 수 있게 주 가설과 추가 실험을 나눴습니다.
+RQ1은 사전 확인입니다. 본 장면 데이터에서, 사물 정보를 넘어 뇌와 맥락 embedding이 공유하는 저차원 축이 있는지 봅니다.
+RQ2가 주 가설입니다. 쉽게 말하면, 뇌 반응을 기준으로 고른 k개 축이 텍스트만 보고 고른 k개 축보다 imagery에서 더 잘 읽히는가입니다. 뇌 영역은 시각피질로 고정하고 target만 바꿉니다.
+RQ3는 추가 실험으로, RQ2 설정에 기억 영역만 더해 추가 이득이 있는지 봅니다.</aside>
+</section>
+
+<!-- 8 -->
+<section class="slide" data-phase="해결 방법">
+  <h2>선행연구</h2>
+  <div class="body" style="justify-content:flex-start;gap:0">
+    <table>
+      <thead><tr><th>연구</th><th>대상</th><th>Target</th><th class="c">해석 가능 축</th><th class="c">기억 영역</th><th class="c">Object·relation 통제</th></tr></thead>
+      <tbody>
+        <tr><td>Generic decoding<span class="tag">Horikawa &amp; Kamitani 2017</span></td><td class="i">Imagery</td><td>DNN 계층별 특징</td><td class="c"><span class="dot half" aria-label="부분"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td></tr>
+        <tr><td>NSD-Imagery<span class="tag">Kneeland et al. 2025</span></td><td class="i">Imagery</td><td>CLIP 등 고정 공간</td><td class="c"><span class="dot none" aria-label="없음"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td></tr>
+        <tr><td>MIRAGE<span class="tag">2025</span></td><td class="i">Imagery</td><td>VDVAE·CLIP 병렬</td><td class="c"><span class="dot none" aria-label="없음"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td></tr>
+        <tr><td>Seeing the imagined<span class="tag">Spera et al. 2026</span></td><td class="i">Imagery</td><td>CLIP 공간 정렬</td><td class="c"><span class="dot none" aria-label="없음"></span></td><td class="c"><span class="dot half" aria-label="부분"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td></tr>
+        <tr><td>Imagery transformation<span class="tag">Saha Roy et al. 2025</span></td><td class="i">Imagery</td><td>복셀 공간</td><td class="c"><span class="dot half" aria-label="부분"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td></tr>
+        <tr><td>NEURONA<span class="tag">ICLR 2026</span></td><td class="v">Perception</td><td>Scene graph</td><td class="c"><span class="dot half" aria-label="부분"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td><td class="c"><span class="dot half" aria-label="부분"></span></td></tr>
+        <tr><td>Scene·object 차원<span class="tag">Stansbury 2013, Contier 2024</span></td><td class="v">Perception</td><td>저차원 해석 축</td><td class="c"><span class="dot full" aria-label="있음"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td><td class="c"><span class="dot none" aria-label="없음"></span></td></tr>
+        <tr class="ours"><td>본 연구</td><td class="i">Imagery</td><td>뇌 정렬 context 축</td><td class="c"><span class="dot full" aria-label="있음"></span></td><td class="c"><span class="dot full" aria-label="있음"></span></td><td class="c"><span class="dot full" aria-label="있음"></span></td></tr>
+      </tbody>
+    </table>
+    <div class="legend"><span><span class="dot full"></span> 있음</span><span><span class="dot half"></span> 부분</span><span><span class="dot none"></span> 없음</span></div>
+  </div>
+  <aside class="notes">선행연구입니다.
+가장 가까운 고전 연구는 Horikawa와 Kamitani로, 본 장면으로 학습한 DNN 계층 특징 decoder를 imagery에 적용했습니다. NSD-Imagery 원 논문과 MIRAGE도 본 장면 decoder를 imagery에 적용했습니다. 다만 세 연구 모두 target은 모델이 정해 둔 공간입니다.
+Seeing the imagined는 시각 외 영역을 엽 단위로 더했지만 이득이 미미했고, 저자들도 target이 CLIP으로 고정된 것을 한계로 들었습니다. Saha Roy 등은 imagery가 더 적은 차원을 쓴다는 것을 복셀 수준에서 보였지만 그 차원의 의미는 다루지 않았고, NEURONA와 Stansbury, Contier는 perception 연구입니다.
+그래서 저희가 검증하는 주장은 하나입니다. 기존 embedding 공간 안에서 target 축을 뇌에 맞춰 고르면, 같은 개수를 뇌 정보 없이 고른 것보다 imagery로 더 잘 전이되는가. 공간이나 알고리즘이 새로운 것이 아니라, 축을 고르는 기준이 다릅니다.</aside>
+</section>
+
+<!-- 9 -->
+<section class="slide" data-phase="해결 방법">
+  <h2>차별성</h2>
+  <div class="body">
+    <div class="cmp">
+      <span class="k">Target</span><span class="old">모델이 정한 고차원 공간</span><span class="to">→</span><span class="new i">뇌가 지지하는 저차원 context 축</span>
+      <span class="k">해석</span><span class="old">복원 이미지 점수</span><span class="to">→</span><span class="new">축별로 "무엇이 남았나"</span>
+      <span class="k">영역</span><span class="old">시각피질, 또는 엽 단위</span><span class="to">→</span><span class="new">시각피질 + <span class="m">기억 영역</span></span>
+    </div>
+    <p class="analogy">그림 전체를 그리는 대신, "실내인가? 여가인가?" 같은 몇 개의 질문에 답하기</p>
+  </div>
+  <aside class="notes">차별성은 세 가지입니다.
+첫째, target입니다. 모델이 정한 고차원 공간을 통째로 맞히는 대신, 뇌가 지지하는 몇 개의 맥락 축만 맞힙니다. 그림 전체를 그리는 대신 "실내인가", "여가인가" 같은 몇 개의 질문에 답하는 방식입니다.
+둘째, 해석입니다. 복원 점수 하나가 아니라 축별로 무엇이 남았는지 말하는 것을 목표로 합니다. 축 하나가 곧 의미 하나라는 보장은 없어서, 이는 가정으로 두고 확인 절차를 거칩니다.
+셋째, 영역입니다. 기억 인출 가설에 따라 고른 기억 영역을 시각피질과 함께 봅니다.</aside>
+</section>
+
+<!-- 10 -->
+<section class="slide" data-phase="구현">
+  <h2>데이터셋</h2>
+  <div class="body">
+    <div class="data">
+      <div class="card v">
+        <h3>NSD core</h3>
+        <p class="role v">학습</p>
+        <ul>
+          <li>7T fMRI, 피험자 4명 <span>(1·2·5·7번)</span></li>
+          <li>1인당 약 1만 장 × 최대 3회</li>
+          <li>COCO 자연 이미지 + 캡션</li>
+        </ul>
+      </div>
+      <div class="card i">
+        <h3>NSD-Imagery</h3>
+        <p class="role i">평가</p>
+        <ul>
+          <li>같은 피험자, target 18개</li>
+          <li>도형 6 <span>/</span> 자연 장면 6 <span>/</span> 단어 개념 6</li>
+          <li>Target당 보기 8회, 떠올리기 16회</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <p class="source">Allen et al., Nat Neurosci 2022 / Kneeland et al., CVPR 2025</p>
+  <aside class="notes">데이터는 두 공개 데이터셋입니다.
+NSD core는 피험자들이 COCO 자연 이미지를 1인당 약 1만 장, 최대 세 번씩 본 7테슬라 fMRI 데이터이고, 전체 세션을 마친 4명을 학습에 씁니다.
+NSD-Imagery는 같은 피험자들이 도형, 자연 장면, 단어 개념 각 6개씩, 총 18개 target을 보고 또 떠올린 데이터로, target마다 보기 8회, 떠올리기 16회가 있습니다. 평가에만 씁니다.</aside>
+</section>
+
+<!-- 11 -->
+<section class="slide" data-phase="구현">
+  <h2>전처리</h2>
+  <div class="body">
+    <dl class="pre">
+      <dt>분할</dt>
+      <dd>shared1000 학습 제외 <span class="muted">(imagery 자연 장면 5장 포함, 누수 차단)</span></dd>
+      <dt>ROI</dt>
+      <dd><div class="chips"><span class="chip v">시각피질</span><span class="chip m">Place memory area</span><span class="chip m">해마 앞·뒤</span><span class="chip m">측두 의미 영역</span><span class="chip">크기 맞춘 대조 영역</span></div></dd>
+      <dt>Target</dt>
+      <dd>
+        <div class="texts3">
+          <span class="lab">원본</span><span>"A man riding a wave on a surfboard"</span><span class="role3">사람 캡션 (COCO)</span>
+          <span class="lab">Object-only</span><span>"person, surfboard"</span><span class="role3">사람 라벨 (COCO)</span>
+          <span class="lab">Context-only</span><span class="ctx">"a seaside scene, outdoor, natural, leisure, wide view"</span><span class="role3 key">정의 후 라벨링</span>
+        </div>
+        <p class="muted" style="font-size:24px;margin-top:12px">같은 embedding 모델, 텍스트만 다르게 → 차이는 "무엇을 담았나"에서만 발생</p>
+      </dd>
+    </dl>
+  </div>
+  <aside class="notes">전처리는 세 가지입니다.
+먼저 분할입니다. imagery 자연 장면 5장이 NSD 공통 테스트 세트인 shared1000에서 왔으므로, 이 세트는 학습에서 뺍니다. 시험 문제를 미리 보지 않게 하는 것입니다.
+다음은 ROI로, 시각피질, 장소 기억 영역·해마·측두 의미 영역 같은 기억 영역, 그리고 크기만 맞춘 대조 영역입니다.
+마지막으로 target 텍스트를 세 가지로 만듭니다. 캡션 하나에는 "누가, 무엇을, 어디서"가 섞여 있어서, 잘 읽혀도 맥락 덕분인지 서핑보드를 알아본 덕분인지 알 수 없기 때문입니다. 그래서 사람 캡션인 원본을 기준으로, COCO 사물 라벨만 나열한 object-only를 통제로, 맥락만 담은 context-only를 가설 검증용으로 둡니다. 세 텍스트는 같은 embedding 모델로 좌표화해서, 차이가 내용에서만 생기게 합니다.</aside>
+</section>
+
+<section class="slide" data-phase="구현">
+  <h2>Context 라벨링</h2>
+  <div class="body" style="justify-content:flex-start;gap:0">
+    <div class="defn">
+      <p>맥락은 개별 사물이나 그들 사이의 관계를 넘어, 장면이 놓인 상황에 대한 정보다.</p>
+      <p>본 연구에서는 이를 <b>장소 유형, 환경 속성, 활동·기능, 공간 규모</b>의 네 차원으로 정의한다.</p>
+    </div>
+    <table class="dims">
+      <thead><tr><th>차원</th><th>예시 값</th><th>근거</th></tr></thead>
+      <tbody>
+        <tr><td>장소 유형</td><td>바닷가, 부엌, 거리, 산</td><td>장면 범주 체계 (SUN, Places)</td></tr>
+        <tr><td>환경 속성</td><td>실내/실외, 자연/인공</td><td>전역 속성 (Oliva &amp; Torralba 2001)</td></tr>
+        <tr><td>활동·기능</td><td>여가, 식사, 이동, 업무</td><td>기능 기반 장면 분류 (Greene et al. 2016)</td></tr>
+        <tr><td>공간 규모</td><td>근접, 중간, 원경</td><td>장면의 깊이 속성 (Oliva &amp; Torralba 2001)</td></tr>
+      </tbody>
+    </table>
+    <p class="tpl">규칙: 사물 이름과 관계 술어는 어느 차원에도 사용 금지, 정해진 어휘 안에서만 선택</p>
+    <div class="proc">
+      <span>키워드 최대 추출</span><i>→</i><span>기준에 따라 쳐내 어휘 확정</span><i>→</i><span class="k">LLM 라벨링</span><i>→</i><span>다른 LLM과 일치도</span><i>→</i><span>사람 검증 200장</span><i>→</i><span>COCO-Stuff·Places365 대조</span>
+    </div>
+  </div>
+  <aside class="notes">맥락에는 사람이 붙인 라벨이 없어서, 먼저 정의하고 그 안에서만 라벨링합니다.
+저희는 맥락을 개별 사물이나 관계를 넘어 장면이 놓인 상황에 대한 정보로 보고, 장소 유형, 환경 속성, 활동·기능, 공간 규모의 네 차원으로 정의했습니다. 모두 장면 인식 연구에서 사람이 장면을 구분하는 기준입니다.
+사물 이름과 관계 술어는 쓸 수 없고, 미리 정한 어휘 안에서만 고릅니다. LLM으로 라벨링한 뒤, 다른 LLM과의 일치도, 직접 라벨링한 200장, 그리고 COCO-Stuff와 Places365로 검증합니다.</aside>
+</section>
+
+<section class="slide" data-phase="구현">
+  <h2>구현 개요</h2>
+  <div class="body">
+    <div class="ov">
+      <div><i>1</i><b>Target 준비</b><p>원본·object-only·context-only 텍스트를 같은 모델로 embedding</p></div>
+      <div class="hl"><i>2</i><b>축 찾기</b><p>Perception fMRI와 context embedding이 함께 변하는 방향 k개</p><small>사전 점검: RSA, encoding 예측력<br>후보 기법: PLS, reduced-rank regression</small></div>
+      <div class="hl"><i>3</i><b>전이</b><p>k개 축 점수를 예측하는 decoder 학습 후 imagery에 그대로 적용</p><small>후보 기법: ridge regression</small></div>
+    </div>
+    <div class="tools">
+      <span>데이터</span><span>NSD beta, COCO 캡션·사물 라벨, COCO-Stuff</span>
+      <span>AI</span><span>LLM 라벨링, 문장 embedding 모델, CLIP (기준선)</span>
+      <span>분석</span><span>Python, scikit-learn, nilearn, permutation test</span>
+    </div>
+    <p class="muted" style="font-size:22px">세부 기법은 논의 후 확정</p>
+  </div>
+  <aside class="notes">구현은 세 단계이고, 세부 기법은 오늘 논의를 거쳐 정하려 합니다.
+첫째, 세 종류의 텍스트를 같은 문장 embedding 모델로 좌표화합니다.
+둘째, 축 찾기입니다. 먼저 맥락 embedding과 뇌 반응이 애초에 정보를 공유하는지 RSA와 encoding 예측력으로 확인합니다. 공유 정보가 없으면 찾은 축은 잡음일 뿐이기 때문입니다. 통과하면 둘이 함께 변하는 방향 k개를 PLS나 reduced-rank regression으로 찾고, k는 교차검증으로 정합니다.
+셋째, 전이입니다. fMRI에서 k개 축 점수를 예측하는 ridge decoder를 학습해, 추가 학습 없이 imagery에 적용합니다.
+분석은 Python 기반으로 scikit-learn과 nilearn을 씁니다.</aside>
+</section>
+
+<!-- 12 -->
+<!-- <section class="slide" data-phase="구현">
+  <h2>방법</h2>
+  <div class="body">
+    <div class="pipe">
+      <div><i>1</i><b>통제</b><p>Object·relation 성분을 회귀로 제거</p></div>
+      <div class="hl"><i>2</i><b>추출</b><p>PLS·RRR 교차분해로 context 축 k개, k는 교차검증</p></div>
+      <div><i>3</i><b>명명</b><p>캡션을 축에 투영해 이름 붙이기</p></div>
+      <div><i>4</i><b>학습</b><p>ROI 조건별 k차원 ridge decoder</p></div>
+      <div class="hl"><i>5</i><b>전이</b><p>NSD-Imagery에 추가 학습 없이 적용</p></div>
+    </div>
+    <p class="analogy">통제 = 녹음에서 배경음을 지우고 목소리만 남기기</p>
+  </div>
+  <aside class="notes">방법은 다섯 단계입니다.
+1번, 통제. 고수준 시각 영역 반응에서 객체와 관계로 설명되는 부분을 회귀로 지웁니다. 녹음에서 배경음을 지우고 목소리만 남기는 것과 비슷합니다.
+2번, 추출. 남은 뇌 반응과 맥락 embedding이 함께 변하는 방향을 PLS나 reduced-rank regression 같은 교차분해로 찾습니다. 축 개수 k는 미리 정하지 않고 교차검증으로 정합니다.
+3번, 명명. 캡션들을 각 축에 투영해서 양 끝에 어떤 장면이 오는지 보고 이름을 붙입니다.
+4번, 학습. ROI 조건별로 fMRI에서 k개 축 점수를 예측하는 ridge decoder를 학습합니다.
+5번, 전이. 이 decoder를 NSD-Imagery에 추가 학습 없이 적용합니다. 참고로 NSD-Imagery 논문에서도 단순한 선형 구조가 imagery에 더 잘 일반화했습니다.</aside>
+</section> -->
+
+<!-- 13 -->
+<!-- <section class="slide" data-phase="구현">
+  <h2>핵심 기술</h2>
+  <div class="body">
+    <div class="tech">
+      <div><h3>AI</h3><p>LLM 캡션 재작성, 문장 embedding, CLIP 기준선</p></div>
+      <div><h3>데이터 분석</h3><p>Ridge, PLS / reduced-rank regression, RSA, permutation test</p></div>
+      <div><h3>fMRI 처리</h3><p>NSD beta 추출, ROI 마스킹, 피험자 공간 atlas 변환</p></div>
+      <div><h3>시각화</h3><p>Context 축과 결과를 탐색하는 웹 뷰어</p></div>
+    </div>
+  </div>
+  <aside class="notes">핵심 기술은 네 묶음입니다.
+AI 쪽에서는 캡션 재작성용 LLM, 문장 embedding 모델, 그리고 기준선용 CLIP을 씁니다.
+데이터 분석은 ridge 회귀, PLS와 reduced-rank regression, RSA, permutation test가 중심입니다.
+fMRI 처리는 NSD가 제공하는 beta 값에서 ROI 마스크로 복셀을 뽑고, 기억 영역 atlas를 피험자 공간으로 옮기는 작업입니다.
+마지막으로 찾은 축과 결과를 직접 살펴볼 수 있는 웹 뷰어를 만듭니다.</aside>
+</section> -->
+
+<!-- 14 -->
+<section class="slide" data-phase="평가">
+  <h2>비교 실험</h2>
+  <div class="body" style="justify-content:flex-start;gap:0">
+    <table class="big">
+      <thead><tr><th>비교 조건</th><th>확인하는 것</th></tr></thead>
+      <tbody>
+        <tr><td>CLIP-image target</td><td>기존 방식 (출발점)</td></tr>
+        <tr><td>전체 차원 context embedding</td><td>Target 내용(context)의 효과</td></tr>
+        <tr><td>무작위 k축</td><td>차원을 줄인 것 자체의 효과</td></tr>
+        <tr><td>Embedding PCA k축</td><td>데이터 구조로 방향을 고른 효과</td></tr>
+        <tr><td><b>뇌 정렬 k축</b></td><td class="i" style="font-weight:700">뇌 정렬의 효과 (PCA k축과의 차이)</td></tr>
+        <tr><td>시각피질 / <span class="m">+기억 영역</span> / +대조 영역</td><td>기억 영역의 기여</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="margin-top:24px">Target 비교(위 5줄)는 한 칸씩 하나만 바뀜, 축 개수 k는 동일</p>
+  </div>
+  <aside class="notes">비교 실험은 성능이 올랐을 때 무엇 덕분인지 가리도록 설계했습니다.
+CLIP target에서 출발해 한 칸씩 한 가지만 바꿉니다. 전체 차원 맥락 embedding은 target 내용의 효과, 무작위 k축은 차원을 줄인 효과, PCA k축은 데이터 구조로 방향을 고른 효과이고, 마지막 뇌 정렬 k축이 제 방법입니다.
+핵심 판정은 뇌 정렬 k축과 PCA k축의 차이입니다. 축 개수와 decoder가 같고, 방향을 고른 기준만 다릅니다.
+마지막 줄은 뇌 영역 비교로, 대조 영역은 복셀 수만 늘어서 좋아진 것인지 걸러 냅니다. target 비교는 시각피질로, 영역 비교는 target을 고정해서 봅니다.</aside>
+</section>
+
+<!-- 15 -->
+<section class="slide" data-phase="평가">
+  <h2>평가 지표</h2>
+  <div class="body">
+    <div class="metrics">
+      <div><b>후보 순위</b><p>같은 후보 이미지 집합에서 정답이 몇 등인가</p></div>
+      <div><b>Permutation test</b><p>정답 짝을 섞은 경우보다 유의하게 좋은가</p></div>
+      <div><b>k-곡선</b><p>몇 개 축까지 imagery에서 살아남는가</p></div>
+    </div>
+    <p class="rule">모든 조건: 같은 후보·같은 분할·같은 지표 / 축 추출과 k 선택은 NSD core에서만</p>
+  </div>
+  <aside class="notes">평가 지표는 세 가지입니다.
+첫째, 후보 순위입니다. 저차원 축과 CLIP 공간은 점수 척도가 달라서, 같은 후보 이미지 집합에서 정답이 몇 등인지로 바꿔 비교합니다. 후보는 학습에서 뺀 shared1000입니다.
+둘째, permutation test로 우연보다 나은지 봅니다.
+셋째, k-곡선으로 몇 개 축까지 imagery에서 살아남는지 봅니다.
+축 추출과 k 선택은 NSD core에서만 하고, imagery는 평가에만 씁니다.</aside>
+</section>
+
+<!-- 16 -->
+<section class="slide" data-phase="계획">
+  <h2>일정</h2>
+  <div class="body">
+    <div class="gantt">
+      <div class="wk"><i>1주</i><p>데이터·ROI 준비, context 라벨링·검증</p><span class="gate">사전 점검</span></div>
+      <div class="wk"><i>2주</i><p>Context 축 추출</p><span class="gate">RQ1 확인</span></div>
+      <div class="wk"><i>3주</i><p>Decoder 학습, imagery 평가</p><span class="gate">RQ2 평가</span></div>
+      <div class="wk"><i>4주</i><p>기억 영역 추가 실험, 기준선 비교</p></div>
+      <div class="wk"><i>5주</i><p>통계 검정, 결과 시각화</p></div>
+      <div class="wk"><i>6주</i><p>결과 정리, 보고서</p></div>
+    </div>
+  </div>
+  <aside class="notes">일정은 6주 기준입니다.
+1주차에 데이터 준비와 맥락 라벨링·검증을 하고, 사전 점검으로 맥락 embedding과 뇌의 공유 정보를 확인합니다. 2주차에 축을 추출해 RQ1을, 3주차에 decoder를 학습해 RQ2를 확인합니다. 4주차에 기억 영역 실험과 기준선 비교, 5주차에 통계와 시각화, 6주차에 보고서를 작성합니다.</aside>
+</section>
+
+<!-- 17 -->
+<!-- <section class="slide" data-phase="계획">
+  <h2>리스크</h2>
+  <div class="body">
+    <div class="risk">
+      <div>
+        <h3>예상 문제와 대응</h3>
+        <dl>
+          <dt>재정렬</dt><dd>Perception 축이 imagery와 어긋날 수 있음 <span class="muted">→ 가설로 검증</span></dd>
+          <dt>누수</dt><dd>Context 라벨에 사물 단서 <span class="muted">→ 닫힌 어휘, 누수 측정</span></dd>
+          <dt>규모</dt><dd>자연 장면 target 5개 <span class="muted">→ 효과 크기와 신뢰구간 보고</span></dd>
+        </dl>
+      </div>
+      <div>
+        <h3>결과별 해석</h3>
+        <dl>
+          <dt>사전 ✗</dt><dd>Context embedding과 뇌의 공유 정보 부족, 축 추출 중단</dd>
+          <dt>RQ1 ✗</dt><dd>Object를 넘는 context 축은 이 데이터에서 확인 불가</dd>
+          <dt>RQ2 ✗</dt><dd>뇌 정렬보다 차원 축소 자체가 중요</dd>
+          <dt>RQ3 ✗</dt><dd>Perception 학습으로는 기억 영역을 읽기 어려움</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">예상 리스크와 대응입니다.
+첫째, 본 장면에서 찾은 축이 imagery에서는 방향이 틀어질 수 있습니다. 선행연구가 초기 시각피질에서 보인 현상이고, 저희는 의미 수준 축에서는 덜 틀어질 것이라는 가설을 검증합니다.
+둘째, 맥락 라벨에 사물 단서가 새어 들어갈 수 있어서, 미리 정한 어휘 안에서만 고르게 하고 남은 누수는 측정해 보고합니다.
+셋째, 자연 장면 target이 5개뿐이라 검정력이 제한됩니다. 그래서 유의성만이 아니라 효과 크기와 신뢰구간을 함께 보고합니다.
+오른쪽은 결과가 기대와 다를 때의 해석을 미리 정한 것입니다. 사전 점검에서 RSA와 encoding 예측력이 모두 우연 수준이면, context embedding과 뇌가 공유하는 정보가 부족한 것이므로 축 추출로 넘어가지 않고 context 정의나 embedding 모델을 재검토합니다. RQ1이 안 되면, 이 데이터에서는 object를 넘는 맥락 축을 확인할 수 없다는 뜻입니다. RQ2가 안 되면, 뇌에 정렬하는 것보다 차원을 줄이는 것 자체가 중요했다는 뜻입니다. RQ3가 안 되면, 기억 영역에 정보가 없다는 것이 아니라, perception으로 학습한 decoder로는 그 영역을 읽기 어렵다는 뜻입니다. 어느 경우든 무엇이 지지되지 않았는지를 분명히 말할 수 있도록 설계했습니다.</aside>
+</section> -->
+
+<!-- 18 -->
+<section class="slide" data-phase="계획">
+  <h2>최종 결과물</h2>
+  <div class="body">
+    <div class="outs" style="grid-template-columns:repeat(3,1fr)">
+      <div><b>Decoding 모델</b><p>Context 축 기반 imagery decoder와 재현 가능한 코드</p></div>
+      <div><b>검증 결과</b><p>RQ1~3에 대한 답, 기준선 대비 비교와 k-곡선</p></div>
+      <div><b>연구 보고서</b><p>논문 형식의 결과 정리, 졸업논문으로 확장</p></div>
+    </div>
+  </div>
+  <aside class="notes">최종 결과물은 세 가지입니다. 맥락 축 기반 imagery decoding 모델과 재현 가능한 코드, 기준선 비교와 k-곡선을 담은 RQ별 검증 결과, 그리고 졸업논문으로 확장할 연구 보고서입니다.
+감사합니다. 질문 받겠습니다.</aside>
+</section>
+
+<!-- 19 -->
+<!-- <section class="slide" data-phase="계획">
+  <h2>요약</h2>
+  <div class="body">
+    <dl class="sum">
+      <dt>문제</dt><dd>Perception decoder의 <span class="i">imagery</span> 전이는 제한적이다</dd>
+      <dt>가설</dt><dd>뇌에 정렬한 저차원 context 축이 imagery로 더 잘 전이된다</dd>
+      <dt>평가</dt><dd>CLIP target, 뇌 정보 없는 축과 imagery에서 비교한다</dd>
+    </dl>
+    <p class="thanks">감사합니다</p>
+  </div>
+  <aside class="notes">정리하겠습니다.
+문제는, 본 장면으로 학습한 decoder의 imagery 전이 성능이 모델과 조건에 따라 제한적이라는 것입니다.
+가설은, perception fMRI에 정렬한 저차원 맥락 축을 target으로 쓰면 imagery로 더 잘 전이된다는 것이고, 기억 영역은 추가 실험으로 봅니다.
+평가는, 기존 CLIP target과 뇌 정보 없이 만든 축을 기준선으로 두고 imagery에서 객관적으로 비교합니다.
+감사합니다. 질문 받겠습니다.</aside>
+</section> -->
+
+</div></div>
+
+<div id="nav"><button id="prev" aria-label="이전 슬라이드">이전</button><button id="next" aria-label="다음 슬라이드">다음</button></div>
+<div id="notesPanel" aria-live="polite"><h4 id="notesTitle"></h4><div id="notesBody"></div></div>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var phases = ['문제 정의','해결 방법','구현','평가','계획'];
+  var stage = document.getElementById('stage');
+  var idx = 0;
+
+  slides.forEach(function(s, n){
+    var ph = s.getAttribute('data-phase');
+    if (ph) {
+      var t = document.createElement('div'); t.className = 'track';
+      phases.forEach(function(p){ var sp = document.createElement('span'); sp.textContent = p; if (p === ph) sp.className = 'on'; t.appendChild(sp); });
+      s.appendChild(t);
+    }
+    if (n > 0) {
+      var pg = document.createElement('div'); pg.className = 'pageno'; pg.textContent = (n + 1) + ' / ' + slides.length;
+      s.appendChild(pg);
+    }
+  });
+
+  function fit(){
+    var notesOn = document.body.classList.contains('show-notes');
+    var w = window.innerWidth, h = window.innerHeight * (notesOn ? 0.66 : 1) - 70;
+    var sc = Math.min((w - 40) / 1600, h / 900);
+    stage.style.transform = 'scale(' + sc + ')';
+    document.getElementById('viewport').style.bottom = notesOn ? '34vh' : '0';
+  }
+
+  function show(n){
+    idx = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function(s, k){ s.classList.toggle('active', k === idx); });
+    var notes = slides[idx].querySelector('.notes');
+    var title = slides[idx].querySelector('h2, h1');
+    document.getElementById('notesTitle').textContent = (idx + 1) + '. ' + (title ? title.textContent : '');
+    var body = document.getElementById('notesBody'); body.innerHTML = '';
+    (notes ? notes.textContent.trim().split('\n') : []).forEach(function(line){
+      var p = document.createElement('p'); p.textContent = line; p.style.marginBottom = '6px'; body.appendChild(p);
+    });
+    if (location.hash !== '#' + (idx + 1)) history.replaceState(null, '', '#' + (idx + 1));
+  }
+
+  function toggleNotes(){
+    var on = document.body.classList.toggle('show-notes');
+    document.getElementById('btnNotes').setAttribute('aria-pressed', on ? 'true' : 'false');
+    fit();
+  }
+
+  document.getElementById('prev').onclick = function(){ show(idx - 1); };
+  document.getElementById('next').onclick = function(){ show(idx + 1); };
+  document.getElementById('btnNotes').onclick = toggleNotes;
+  document.getElementById('btnFull').onclick = function(){
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function(){});
+    else if (document.exitFullscreen) document.exitFullscreen().catch(function(){});
+  };
+  document.addEventListener('keydown', function(e){
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'PageDown' || k === ' ') { e.preventDefault(); show(idx + 1); }
+    else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); show(idx - 1); }
+    else if (k === 'Home') show(0);
+    else if (k === 'End') show(slides.length - 1);
+    else if (k === 'n' || k === 'N') toggleNotes();
+    else if (k === 'f' || k === 'F') document.getElementById('btnFull').click();
+  });
+  window.addEventListener('resize', fit);
+  window.addEventListener('hashchange', function(){
+    var h = parseInt((location.hash || '').replace('#', ''), 10);
+    if (!isNaN(h) && h - 1 !== idx) show(h - 1);
+  });
+  var start = parseInt((location.hash || '').replace('#', ''), 10);
+  show(isNaN(start) ? 0 : start - 1);
+  fit();
+})();
+</script>
+</body>
+</html>
