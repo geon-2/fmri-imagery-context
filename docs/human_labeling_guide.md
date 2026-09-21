@@ -25,13 +25,27 @@
 
 | 열 | 묻는 것 | 예시 값 |
 |---|---|---|
-| `place_type` | 어떤 종류의 장소인가 | kitchen, street, beach, sports field, restaurant |
-| `environment` | 환경의 속성은 어떤가 | indoor, outdoor, snowy, crowded, dim lighting, sunny |
-| `activity` | 이곳은 무엇을 하는 곳이고 어떤 활동이 벌어지는가 | playing sport, dining, commuting, shopping |
-| `scale` | 공간의 규모는 어떤가 | close-up, single room, street-level, wide landscape |
+| `place_type` | 어떤 종류의 장소인가 (장소 이름 하나를 중심으로) | kitchen, street, beach, sports field, restaurant |
+| `environment` | 환경의 속성은 어떤가: 실내/야외, 시간대, 날씨·하늘, 계절, 밝기, 상태(더러움, 한적함) | indoor, outdoor, snowy, midday, dim lighting, crowded |
+| `activity` | 이곳은 무엇을 하는 곳이고 어떤 **활동**이 벌어지는가 | playing sport, dining, commuting, shopping |
+| `scale` | **장소 자체의 공간 규모**는 어떤가 (촬영 구도가 아니다) | small kitchen, large lounge, small street, wide field |
 
 예시 값은 이해를 돕기 위한 것이다. **목록이 아니다.** 떠오르는 표현을 그대로 쓴다.
 (어휘는 파일럿 결과를 본 뒤 정한다. 지금은 정하지 않았다.)
+
+### 차원별 유의점 (실제 작성분 43장을 보고 정리)
+
+- **`place_type`**: 장소 이름을 중심으로 쓴다. 세부 위치나 관계("차 앞", "소파 위", "건물 외벽")를 함께 적어도 되지만
+  정리할 때 부가 정보로 다룬다. 장소가 불분명하면 후보를 여러 개 적고 `notes`에 애매함을 적는다.
+- **`environment`**: 위에 적은 여러 종류(실내/야외, 시간대, 날씨, 계절, 밝기, 상태)를 모두 적어도 된다. 서로 모순되는 값
+  (`낮; 새벽`)도 지우지 않는다.
+- **`activity`**: **활동이 실제로 보일 때만** 적는다. 책상 위 시계, 빈 화장실, 모래 조형물처럼 활동이 없으면 빈 칸이
+  맞다. 옷 색깔, 물건, 외양까지 자세히 쓸 필요는 없다(써도 정리 때 걸러진다).
+- **`scale`**: 장소 자체가 작은지 큰지만 쓴다. 공간 규모가 `place_type`에 이미 담겨 있거나(예: `넓은 휴게실`) 눈에 띄지
+  않으면 비워도 된다. 이 차원을 유지할지는 파일럿에서 값의 분포를 본 뒤 정한다.
+- **촬영 구도**(클로즈업, 위/아래에서 찍음, 사진 비율)는 맥락이 아니라 사진을 찍는 방식이다. 서브젝트가 본 이미지는
+  정사각형으로 잘렸기 때문에 원본 구도와도 다르다. `scale`에 적지 말고, 적고 싶으면 `notes`에 적는다(적지 않아도 된다).
+- **사람 속성**(나이, 관계, 국적, 옷)은 맥락이 아니므로 적지 않아도 된다.
 
 ## 쓰는 방법
 
@@ -43,7 +57,8 @@
 - **관계 표현은 쓰지 않는다.** `on`, `next to`, `holding` 같은 것은 라벨이 아니다.
 - **여러 해석이 가능하면 모두 적는다.** 한 개로 줄이지 않는다. 예: `place_type`에 `sports field; stadium`.
 - **더 강하게 보이는 것을 앞에 쓴다.** 순서가 강도를 나타낸다.
-- **판단이 안 서는 칸은 비워도 된다.** 억지로 채우지 않는다.
+- **판단이 안 서는 칸은 비워도 된다.** 억지로 채우지 않는다. ("특정하기 어려움"이라고 적는 대신 비우고
+  `notes`에 이유를 적어도 된다. 이미 적은 것은 정리 때 빈 칸으로 취급한다.)
 - **애매했던 이미지는 `notes`에 한 줄** 적는다("실내인지 야외인지 불분명" 등). 이 표시는 나중에 애매한 이미지를
   찾는 데 쓴다.
 - 민감하거나 불쾌한 이미지가 나오면 `notes`에 `skip`이라고 적고 넘어간다(해당 이미지는 분석에서 뺀다).
@@ -52,9 +67,10 @@
 
 | 장면 | place_type | environment | activity | scale | notes |
 |---|---|---|---|---|---|
-| 카페 창가에서 노트북을 펴고 앉은 사람 | cafe | indoor; daylight | working; drinking coffee | single room | |
-| 눈 쌓인 언덕 위에 스키를 든 두 사람 | ski slope; mountain | outdoor; snowy | skiing | wide landscape | |
+| 카페 창가에서 노트북을 펴고 앉은 사람 | cafe | indoor; daylight | working; drinking coffee | small cafe | |
+| 눈 쌓인 언덕 위에 스키를 든 두 사람 | ski slope; mountain | outdoor; snowy | skiing | wide slope | |
 | 흐릿하게 찍힌 어두운 실내 | (비움) | indoor; dim lighting | | | 장소 판단 불가 |
+| 책상 위에 놓인 탁상시계 클로즈업 | desk | | | | 활동 없음. 시계 클로즈업 구도 |
 
 ## 신뢰도 확인 (혼자 작성할 때)
 
@@ -73,3 +89,10 @@
 - 이미지당 1~2분, 전체 약 4~6시간을 예상한다. 한 번에 몰아서 하면 기준이 흔들리므로 3~4회로 나눠 하되, 매번 이
   가이드를 다시 읽고 시작한다.
 - 작성 도중 규칙이 바뀌면(표현을 통일하기로 하는 등) 바뀐 시점과 내용을 이 파일 끝에 기록한다.
+
+## 규칙 변경 기록
+
+- **2026-09-21**: 처음 43장(image_id 307~127306)은 이 개정 전 규칙으로 작성했다. 이때 `scale`에는 공간 규모와 촬영 구도가
+  섞여 있었고 `activity`에 외양·물건 정보가 자세히 들어 있었다. 정리 단계에서 `space scale`/`framing`/`dropped`로
+  분리했다(`data/labels/human_labels_translated_draft.md`). 이후 작성분부터 위 "차원별 유의점"을 따른다.
+  나머지 157장은 원본 이미지(잘리지 않은 것)를 보고 작성한다.
