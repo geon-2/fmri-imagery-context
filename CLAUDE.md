@@ -50,14 +50,33 @@
      필요 없는 구성이므로 별도 벤더 키는 전제하지 않는다.
 
    - **`.claude/agents/context-adjudicate.md`**
-     (`model: opus`) 역할: extract/classify/critique-a/critique-b 결과를 모두 받아 최종 라벨을
-     확정하거나, critique 둘의 판단이 갈리면 자동으로 밀어붙이지 않고
-     "review" 상태로 표시한다.
+     (`model: opus`) 역할: 집계된 라벨 분포와 critique-a/critique-b 판정을 받아 라벨별
+     지지도·누수 플래그를 붙인다. **라벨을 삭제하거나 하나로 확정하지 않는다.** critique
+     둘의 판단이 갈리면 자동으로 밀어붙이지 않고 "review" 상태로 표시한다.
+
+## 라벨 구조 원칙 — 해석의 여지를 라벨링 단계에서 닫지 않는다
+
+같은 장면도 사람마다 다르게 해석·표현할 수 있으므로, 라벨링 단계는 여러 해석을 **보존**하고
+해석을 어떻게 합칠지는 representation 추론 단계에서 정한다.
+
+- 다중 라벨 허용: 한 차원에 값이 여러 개여도 된다. 동의어 표현을 라벨링 단계에서 억지로
+  통일하지 않는다.
+- 분포 기반: 이미지당 classify를 N회 독립 샘플링(파일럿 기본 N=3)하고, 메인 세션이 값별
+  `support`(나온 비율)와 `mean_confidence`로 집계한다. 라벨은 삭제하지 않는다.
+- 누수(critique strong)는 삭제 사유가 아니라 **플래그**다. 누수 라벨을 빼고/빼지 않고
+  분석하는 것은 이후 단계의 선택이다.
+- 어휘는 단계적으로: (1) 어휘 없이(`vocab: null`) 샘플링해 표현 분포를 본다 → (2) 사람이 표현을
+  정리해 어휘를 만든다 → (3) 어휘가 생기면 어휘 전체에 대한 dense 점수와 임베딩 기반 보완을
+  검토한다. 어휘는 정답 목록이 아니라 표현 통일용 사전이다.
+- 이 원칙은 Notion에 아직 기록되지 않은 설계 결정이다. 사용자에게 Notion 기록을 요청했는지
+  확인하고 진행한다.
 
 ## 파일럿 단계 (200~500장) — 서브에이전트로 직접 실행
 
 메인 세션이 파일럿 이미지를 순회하며 위 5개 서브에이전트를 이미지당
-`extract → classify → (critique-a, critique-b 동시) → adjudicate` 순서로 호출한다.
+`extract → classify × N(독립 샘플) → 집계(메인 세션) → (critique-a, critique-b 동시) → adjudicate`
+순서로 호출한다. 파일럿은 300장이다(`data/processed/pilot_300.csv`, 시드 0, 후보 풀은
+`src/labeling/build_pool.py`).
 사람이 지켜보며 이상한 사례를 바로 확인할 수 있는 규모이므로, 이 단계는 스크립트로
 자동화하지 않고 서브에이전트 호출을 그대로 쓴다.
 
@@ -98,7 +117,7 @@
 파일럿에서 반드시 확인할 것:
 - 누수: context 라벨만으로 COCO object category를 예측하는 선형 분류기 정확도
   (object-only 상한, 무작위 하한과 함께 보고)
-- critique-a와 critique-b 간 일치도 (Cohen's kappa) — adjudicate로 얼마나 많이
+- critique-a와 critique-b 간 일치도 (라벨 단위 Cohen's kappa; 다중 라벨이므로 라벨 집합 Jaccard도 함께) — review로 얼마나 많이
   넘어갔는지도 함께 집계
 - 사람 라벨(200장, 아직 미작성 — 이 저장소에 없으면 먼저 요청)과의 일치도
 - 환경 속성 ↔ COCO-Stuff, 장소 유형 ↔ Places365 상관

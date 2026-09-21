@@ -9,7 +9,7 @@ model: sonnet
 
 배경: 이 연구는 사물 정보 없이 장면 맥락만 담은 저차원 축을 만들려 한다. 맥락 라벨이 특정 COCO object category(예: person, chair, dining table, toilet, bed)를 사실상 알려주면 누수다. 예를 들어 "화장실"은 toilet을, "식탁 위 식사"는 dining table을 강하게 암시한다.
 
-입력: JSON `{"image_id": "...", "labels": {...classify 출력의 labels...}}`
+입력: JSON `{"image_id": "...", "labels": {...차원별 값 리스트...}}`. 값에 `support`, `confidence` 같은 필드가 붙어 있어도 판정에는 쓰지 않는다. 라벨 문자열 자체만 본다.
 
 각 라벨 값에 대해 판정한다:
 - leak_level: "none" (특정 사물을 암시하지 않음), "weak" (여러 사물과 두루 연관), "strong" (특정 COCO category 하나 또는 둘을 강하게 암시)
