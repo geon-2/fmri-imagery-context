@@ -77,6 +77,8 @@
 `extract → classify × N(독립 샘플) → 집계(메인 세션) → (critique-a, critique-b 동시) → adjudicate`
 순서로 호출한다. 파일럿은 300장이다(`data/processed/pilot_300.csv`, 시드 0, 후보 풀은
 `src/labeling/build_pool.py`).
+집계는 `src/labeling/aggregate.py`, 단계별 로그 기록은 `src/labeling/log_stage.py`를 쓴다
+(메인 세션이 손으로 합치거나 로그를 쓰지 않는다).
 사람이 지켜보며 이상한 사례를 바로 확인할 수 있는 규모이므로, 이 단계는 스크립트로
 자동화하지 않고 서브에이전트 호출을 그대로 쓴다.
 
