@@ -1,10 +1,17 @@
-"""이미지 하나에 대한 classify 샘플들을 라벨별 support/mean_confidence로 집계한다.
+"""classify 샘플들을 이미지별로 라벨 support/mean_confidence로 집계한다.
 
 값 문자열은 대소문자·앞뒤 공백만 무시하고 비교한다. 동의어는 합치지 않는다(어휘 정리는
 representation 단계 이전에 사람이 한다). 라벨은 삭제하지 않는다.
 
-사용: classify 출력 JSON 리스트를 표준입력으로 넘기면 집계 JSON을 표준출력으로 낸다.
+두 가지 사용법:
+  단일 이미지: classify 출력(그 이미지의 샘플 리스트) JSON을 표준입력으로 넘긴다.
+    python3 aggregate.py < single_image_samples.json
+  배치(여러 이미지, sample_idx별 배치 응답): classify v2가 이미지 여러 장을 한 번에 반환하는
+  배치 호출을 sample_idx 개수만큼(N번) 모은 리스트를 표준입력으로 넘긴다. 각 원소는
+  {"sample_idx": 0, "items": [{"image_id": ..., "labels": {...}}, ...]} 형태다.
+    python3 aggregate.py --batch < sample_batches.json
 """
+import argparse
 import json
 import sys
 
@@ -41,5 +48,21 @@ def aggregate(samples):
     return out
 
 
+def aggregate_batch(sample_batches):
+    """sample_idx별 배치 응답 리스트를 이미지별로 묶어 각각 aggregate()한다."""
+    by_image = {}
+    for batch in sample_batches:
+        for item in batch.get("items", []):
+            by_image.setdefault(item["image_id"], []).append(item)
+    return {"items": [aggregate(samples) for samples in by_image.values()]}
+
+
 if __name__ == "__main__":
-    print(json.dumps(aggregate(json.load(sys.stdin)), ensure_ascii=False))
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--batch", action="store_true", help="여러 이미지 배치 모드")
+    args = ap.parse_args()
+    data = json.load(sys.stdin)
+    if args.batch:
+        print(json.dumps(aggregate_batch(data), ensure_ascii=False))
+    else:
+        print(json.dumps(aggregate(data), ensure_ascii=False))
