@@ -1,7 +1,8 @@
-"""단계별 로그를 data/labels/agent_logs/{stage}.jsonl 에 한 줄 append 한다 (git 추적 안 함).
+"""단계별 로그를 data/labels/agent_logs/{stage}.jsonl 에 한 줄씩 append 한다 (git 추적 안 함).
 
-사용: 로그 레코드 JSON을 표준입력으로 넘긴다.
+사용: 로그 레코드 JSON(단일 객체 또는 {"items": [레코드, ...]} 배치)을 표준입력으로 넘긴다.
   python3 src/labeling/log_stage.py --stage classify < record.json
+  python3 src/labeling/log_stage.py --stage classify < batch.json   # {"items":[...]}
 
 레코드 필드는 CLAUDE.md의 로그 스키마를 따른다(image_id, agent_name, agent_model,
 prompt_version, input, raw_output, parsed_label, flags). stage와 timestamp는 여기서 채운다.
@@ -38,4 +39,8 @@ if __name__ == "__main__":
     ap.add_argument("--stage", required=True, choices=STAGES)
     ap.add_argument("--log-dir", default=str(LOG_DIR))
     args = ap.parse_args()
-    append_log(args.stage, json.load(sys.stdin), args.log_dir)
+    data = json.load(sys.stdin)
+    records = data["items"] if isinstance(data, dict) and "items" in data else [data]
+    for rec in records:
+        append_log(args.stage, rec, args.log_dir)
+    print(f"{len(records)}건 기록", file=sys.stderr)
