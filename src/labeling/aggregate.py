@@ -15,7 +15,7 @@ import argparse
 import json
 import sys
 
-DIMENSIONS = ("place_type", "environment", "activity", "scale")
+DIMENSIONS = ("place_type", "environment", "activity", "implied_event", "scale", "notes")
 
 
 def aggregate(samples):

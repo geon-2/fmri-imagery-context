@@ -16,7 +16,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 PILOT = REPO / "data" / "processed" / "pilot_300.csv"
 LOG_DIR = REPO / "data" / "labels" / "agent_logs"
-STAGES = ("extract", "classify", "critique_a", "critique_b", "adjudicate")
+STAGES = ("classify", "critique_a", "critique_b", "adjudicate")
 N_CLASSIFY_SAMPLES = 3  # CLAUDE.md 파일럿 기본값
 
 
@@ -52,7 +52,6 @@ def main():
     remaining = []
     for iid in ids:
         needed = {
-            "extract": 1,
             "classify": N_CLASSIFY_SAMPLES,
             "critique_a": 1,
             "critique_b": 1,
