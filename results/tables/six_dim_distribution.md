@@ -1,0 +1,12 @@
+# 6차원 값 분포 (1만 장 pass 0, 이미지 10,000장, casefold 기준)
+
+값 하나가 얼마나 많은 이미지에 나오는지(이미지 비율)를 본다. 어휘 재정의 필요 여부의 임계값은 정하지 않았다.
+
+| 차원 | 라벨 수 | 고유 값 | 가장 흔한 값의 이미지 비율 | 상위 8개 값(이미지 수) |
+|---|---|---|---|---|
+| place_type | 19,776 | 13,917 | 0.9% | bedroom(87), living room(74), restaurant table(69), home kitchen(67), outdoor tennis court(66), zoo enclosure(60), baseball field(55), small bathroom(54) |
+| environment | 33,085 | 28,606 | 2.7% | outdoors(270), indoors(133), outdoor daylight(95), overcast daylight(46), shallow depth of field(42), outdoor overcast daylight(42), indoor(39), outdoor bright daylight(35) |
+| activity | 19,319 | 18,885 | 0.1% | architectural sightseeing or documentation(7), playing a motion-controlled video game(6), flowers are arranged for display(6), a skateboarder is airborne during a trick(5), bathroom prepared for washing and grooming(5), skateboarder performing an aerial trick(5), food arranged for immediate eating(5), skiing downhill(5) |
+| implied_event | 10,791 | 10,765 | 0.0% | the disc has just been thrown toward the jumping player(3), the batter intends to swing if the incoming pitch is hittable(2), the bus is likely continuing along its route toward the displayed destination(2), the skier appears to have stopped for a photograph before continuing downhill(2), someone has already taken at least one bite and may continue eating(2), the player is trying to return the shot across the court(2), someone likely stepped away from an active computer setup(2), the animal appears to have paused after noticing the photographer(2) |
+| scale | 14,032 | 12,398 | 0.3% | wide interior room view(32), single-room interior view(22), tight food close-up(21), close tabletop food view(18), close tabletop still life(17), medium-wide enclosure view(17), close tabletop view(16), close still-life view(16) |
+| notes | 2,338 | 2,305 | 0.1% | visible photographer watermark in the lower corner(6), square social-media style crop(5), black-and-white photograph(3), grainy low-light snapshot(2), black-and-white image treatment(2), visible watermark indicates a sports photography source(2), camera date stamp is visible in the lower corner(2), thin black border frames the photograph(2) |
