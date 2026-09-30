@@ -15,26 +15,32 @@
    않는다(`tools:` 목록에서 제외) — 텍스트 판단만 하면 되는 작업에 쓰기 권한을 줄
    이유가 없다.
 
-2. **서브에이전트 파일 생성** — `.claude/agents/`에 아래 5개 파일이 없으면 만든다.
+2. **서브에이전트 파일 생성** — `.claude/agents/`에 아래 4개 파일이 없으면 만든다.
    (`/agents` 명령으로 대화형으로 만들어도 되고, 이 명세대로 직접 파일을 써도 된다.)
    각 파일의 `tools`는 `Read, Write`만 허용한다(코드 실행·Notion·웹 접근 없음 —
    순수 텍스트 판단 작업이기 때문). 단, critique-b는 로컬 래퍼 스크립트를 부르므로
    아래에 적은 예외를 따른다.
 
+   **extract 단계는 없다.** 원래는 캡션에서 후보를 뽑아 classify에 넘기는 별도 단계가
+   있었지만, classify가 이미지를 직접 보는 방식으로 바뀐 뒤로는 classify가 캡션과
+   이미지를 모두 직접 받아 처음부터 라벨을 생성한다(후보 목록에 의존하지 않는다) —
+   캡션 재처리만 하는 중복 단계였기 때문에 없앴다.
+
    모델 배정(단계별 역할에 맞춰 나눔 — 판단이 어려운 단계에 큰 모델을 쓴다):
-   extract=`haiku`, classify=`opus`, critique-a=`sonnet`, adjudicate=`opus`,
+   classify=`opus`, critique-a=`sonnet`, adjudicate=`opus`,
    critique-b=Ollama `qwen2.5:14b`(Claude가 아닌 로컬 오픈소스 모델). critique-a와
    adjudicate가 같은 계열이 되지 않도록 critique-a는 `sonnet`으로 유지한다.
 
-   - **`.claude/agents/context-extract.md`**
-     (`model: haiku`) 역할: 캡션에서 맥락 관련 키워드 후보를 최대한 뽑는다(누락보다
-     과다 추출 선호). 사물 이름·행동 자체는 후보에서 걸러내지 않아도 된다 — 그 판단은 다음 단계 몫이다.
-
    - **`.claude/agents/context-classify.md`**
-     (`model: opus`) 역할: extract가 넘긴 후보를 4차원(장소 유형 / 환경 속성 / 활동·기능 / 공간 규모)에
-     배정하거나 "제외"로 표시한다. 사물 이름·관계 술어는 반드시 제외한다.
-     정해진 닫힌 어휘가 있으면 그 안에서만 고른다(파일럿 초반엔 어휘가 아직 없을
-     수 있다 — 그 경우 자유롭게 제안하되 "제안 어휘"로 표시한다).
+     (`model: opus`) 역할: 이미지를 직접 보고(캡션은 참고용) 6차원(장소 유형 / 환경 속성 /
+     활동·기능 / 암묵적 사건·의도 / 공간 규모 / 기타 보충 맥락)에 라벨을 직접 생성한다. 사물
+     이름·관계 술어는 반드시 제외한다. 정해진 닫힌 어휘가 있으면 그 안에서만 고른다(파일럿
+     초반엔 어휘가 아직 없을 수 있다 — 그 경우 자유롭게 제안하되 "제안 어휘"로
+     표시한다). activity는 "지금 보이는 것"만, implied_event는 "직전/의도/다음" 세 갈래
+     (각각 기본 1개, 근거 있을 때만 — 직전/다음이 이미지로 구분 안 되면 그 애매함 자체를
+     하나의 라벨로 남긴다) 담아 activity와 겹치지 않게 한다. notes는 나머지 5차원에 안
+     들어가는 보충 맥락 전용이고 대부분 비어 있어야 한다. 차원별 최소 개수는 place_type 2,
+     environment 3, activity 2다(이미지 수가 많은 배치에서 라벨이 줄어드는 현상 때문에 명시).
 
    - **`.claude/agents/context-critique-a.md`** (`model: sonnet`)
    - **`.claude/agents/context-critique-b.md`** (Ollama `qwen2.5:14b` 래퍼)
@@ -48,6 +54,9 @@
      않는다). 이 파일만 `tools`에 `Bash`가 필요하다(래퍼 실행용) — 그 외 권한은
      주지 않는다. 로그의 `agent_model`에는 실제 Ollama 모델명을 남긴다. API 키가
      필요 없는 구성이므로 별도 벤더 키는 전제하지 않는다.
+     **판정 기준은 고정 규칙(예: "문자열에 사물 이름이 있으면 strong")으로 기계적으로
+     정하지 않는다** — 이 판단 자체가 정량적 정답이 없는 문제라서 두 모델로
+     이중화한 것이므로, 각 모델의 종합적 판단력에 맡긴다. 최종 확인은 사람이 한다.
 
    - **`.claude/agents/context-adjudicate.md`**
      (`model: opus`) 역할: 집계된 라벨 분포와 critique-a/critique-b 판정을 받아 라벨별
@@ -74,8 +83,8 @@
 
 ## 파일럿 단계 (200~500장) — 서브에이전트로 직접 실행
 
-메인 세션이 파일럿 이미지를 **배치**(권장 5~10장씩)로 묶어 위 5개 서브에이전트를
-`extract → classify × N(독립 샘플, 배치당 N번 호출) → 집계(메인 세션, `aggregate.py --batch`)
+메인 세션이 파일럿 이미지를 **배치**(권장 5~10장씩)로 묶어 위 4개 서브에이전트를
+`classify × N(독립 샘플, 배치당 N번 호출) → 집계(메인 세션, `aggregate.py --batch`)
 → (critique-a, critique-b) → adjudicate` 순서로 호출한다. 파일럿은 300장이다
 (`data/processed/pilot_300.csv`, 시드 0, 후보 풀은 `src/labeling/build_pool.py`).
 집계는 `src/labeling/aggregate.py`, 단계별 로그 기록은 `src/labeling/log_stage.py`를 쓴다
@@ -107,7 +116,7 @@
 
 ```json
 {
-  "image_id": "...", "stage": "extract|classify|critique_a|critique_b|adjudicate",
+  "image_id": "...", "stage": "classify|critique_a|critique_b|adjudicate",
   "agent_name": "...", "agent_model": "...", "prompt_version": "v1",
   "input": "...", "raw_output": "...", "parsed_label": {...},
   "flags": ["leakage_suspected", "disagreement", ...],
@@ -132,7 +141,8 @@
   넘어갔는지도 함께 집계
 - 사람 라벨(200장, 아직 미작성 — 이 저장소에 없으면 먼저 요청)과의 일치도
 - 환경 속성 ↔ COCO-Stuff, 장소 유형 ↔ Places365 상관
-- 4차원 각각의 값 분포 (한 값에 쏠리면 어휘 재정의 필요 신호)
+- 6차원(장소 유형/환경 속성/활동·기능/암묵적 사건·의도/공간 규모/기타 보충 맥락) 각각의 값 분포
+  (한 값에 쏠리면 어휘 재정의 필요 신호)
 
 ## 절대 하지 않는 것
 
@@ -141,7 +151,7 @@
 - shared1000(및 NSD-Imagery 자연장면 5장에 대응하는 이미지)을 라벨링 파일럿이나
   축 추출 학습에 포함하지 않는다 — 반드시 학습 분할에서 제외를 먼저 확인한다.
 - 검증 기준을 결과가 나온 뒤에 맞춰 정하지 않는다.
-- 라벨링 서브에이전트(extract/classify/critique/adjudicate)에 Notion MCP 도구를
+- 라벨링 서브에이전트(classify/critique/adjudicate)에 Notion MCP 도구를
   주지 않는다. Notion 쓰기는 메인 세션이, 그것도 사람이 결과를 확인한 뒤 명시적으로
   요청했을 때만 한다 — 파일럿 도중 자동으로 Notion에 기록하지 않는다.
 - Notion에 없는 새로운 설계 결정을 코드만으로 조용히 바꾸지 않는다 — 방향이

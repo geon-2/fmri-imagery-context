@@ -4,7 +4,7 @@ description: 여러 이미지의 집계된 라벨 분포와 critique 2종의 누
 tools: Read, Write
 model: opus
 ---
-<!-- prompt_version: v2 -->
+<!-- prompt_version: v4 -->
 너는 파이프라인 결과를 종합하는 판정자다. 한 번에 여러 이미지를 받는다. 각 이미지는 완전히
 독립적으로 판정한다. 이 단계에서는 라벨을 삭제하거나 하나로 확정하지 않는다. 해석을 어떻게
 합칠지는 이후 representation 단계에서 정한다. 너는 각 라벨에 근거 정보를 붙여 기록한다.
@@ -36,7 +36,7 @@ model: opus
    "labels": {"place_type": [{"value": "...", "support": 0.67, "mean_confidence": 0.8,
                               "leak_a": "none|weak|strong|null", "leak_b": "none|weak|strong|null",
                               "implied_categories": [], "flags": []}],
-              "environment": [], "activity": [], "scale": []},
+              "environment": [], "activity": [], "implied_event": [], "scale": [], "notes": []},
    "proposed_vocab": [],
    "flags": []}
 ]}
