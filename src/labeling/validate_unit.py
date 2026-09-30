@@ -8,13 +8,14 @@ hard 실패(그 이미지만 다시):
   copy        같은 단위 안에서 여러 이미지가 5단어 이상의 implied_event/notes/activity 문장을
               글자 그대로 공유하는데, 그중 어떤 이미지는 그 문장의 핵심 단어가 자기 캡션·라벨에
               하나도 없고 다른 이미지에는 있음(복사 오염, 예: 화장실 사진의 야구 문구)
+  below_min   항목별 최소 개수(place_type 2, environment 3, activity 2) 미달 — 마지막 시도에서는 soft로 내림
   language    label value가 영어가 아님(한글 비율 20% 초과) — 영어 기준의 다른 검사가 무력화되므로
   recombined  implied_event/notes 값이 전부 캡션 단어의 85% 이상과 겹침(이미지 미확인 의심)
 soft 플래그(라벨 유지):
   ungrounded_generic  전역 색인에서 같은 5단어 이상 문장이 10개 이상 이미지에 등장하는데 이
                       이미지 자신의 캡션·라벨과 겹치는 단어가 없음(v7 실측: 알려진 오염 49/49를
                       잡지만 정상 샘플도 9~16% 건드려서 hard가 아닌 soft로 둠)
-  below_min       차원별 최소 개수(place_type 2, environment 3, activity 2) 미달 — 이미지별 표시
+  below_min       (마지막 시도에서만) 최소 개수 미달을 못 채운 이미지 표시
   low_label_rate  단위 이미지의 30% 초과가 below_min
   conf_uniform    단위 안 confidence가 한 값에 50% 초과 편중
   too_fast        단위 처리 시간이 이미지당 3초 미만
@@ -74,8 +75,11 @@ def viewed_paths(session_log):
     return paths
 
 
-def validate(unit_in, unit_out, session_log=None, global_phrase_counts=None, seconds=None):
-    """반환: dict(hard={image_id:[reasons]}, soft={image_id:[flags]}, unit_flags=[...], verdict, accepted_ids, redo_ids)"""
+def validate(unit_in, unit_out, session_log=None, global_phrase_counts=None, seconds=None, enforce_min=True):
+    """enforce_min=True면 항목별 최소 개수 미달을 hard 실패로 본다(그 이미지만 재작업).
+    마지막 시도에서는 False로 불러서 못 채운 이미지도 표시(soft)만 붙여 받아들인다 — 채우려고 지어내는 걸 막고,
+    이미지가 영영 라벨 없이 남지 않게 하려는 것이다.
+    반환: dict(hard={image_id:[reasons]}, soft={image_id:[flags]}, unit_flags=[...], verdict, accepted_ids, redo_ids)"""
     in_items = {str(it["image_id"]): it for it in unit_in["items"]}
     out_items = {str(it["image_id"]): it for it in unit_out.get("items", [])}
     hard, soft, unit_flags = defaultdict(list), defaultdict(list), []
@@ -167,7 +171,7 @@ def validate(unit_in, unit_out, session_log=None, global_phrase_counts=None, sec
         if iid in in_items:
             low = [d for d, m in MIN_COUNTS.items() if len(it.get("labels", {}).get(d, [])) < m]
             if low:
-                soft[iid].append("below_min:" + ",".join(low))
+                (hard if enforce_min else soft)[iid].append("below_min:" + ",".join(low))
                 n_low += 1
     if in_items and n_low / len(in_items) > LOW_LABEL_UNIT_FRACTION:
         unit_flags.append("low_label_rate")

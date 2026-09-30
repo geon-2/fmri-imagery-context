@@ -124,7 +124,7 @@ def add_phrases(items):
     json.dump(counts, open(BASE / "phrase_counts.json", "w", encoding="utf-8"), ensure_ascii=False)
 
 
-def build_prompt(work, rel_in, rel_out, sample_idx, n):
+def build_prompt(work, rel_in, rel_out, sample_idx, n, retry=False):
     return (
         f"작업 저장소: {REPO}\n작업 ID: {work} (추적용 문자열)\n\n"
         f".claude/agents/context-classify.md 파일을 읽고, 프롬프트 본문(YAML frontmatter 아래 전체)을 그대로 따라라.\n"
@@ -132,7 +132,9 @@ def build_prompt(work, rel_in, rel_out, sample_idx, n):
         f"캡션 문장을 재조합해서 채우는 것은 금지다. 이미지에서만 보이는, 캡션에 없는 구체적 정보를 포함시켜라. "
         f"label의 value 문자열은 반드시 영어로 쓴다. 각 이미지의 라벨은 그 이미지만 보고 새로 쓰고, 다른 이미지에 쓴 문장을 그대로 복사하지 마라.\n"
         f"sample_idx는 {sample_idx}이다. 출력은 {rel_out} 로 저장한다(스키마: 프롬프트의 출력 형식 그대로, 입력의 모든 image_id 포함, "
-        f"6차원 키 전부). 이 작업 외에 다른 파일은 만들거나 수정하지 마라. 끝나면 '완료'라고만 답해라.\n"
+        f"6차원 키 전부). "
+        + ("이 이미지들은 이전 시도가 자동 검사를 통과하지 못해 다시 하는 것이다. 특히 항목별 최소 개수(place_type 2, environment 3, activity 2 이상)를 반드시 채워라. " if retry else "")
+        + f"이 작업 외에 다른 파일은 만들거나 수정하지 마라. 끝나면 '완료'라고만 답해라.\n"
     )
 
 
@@ -150,7 +152,7 @@ def run_work(unit, pas, rows_in, model, effort, prompt_sha, dry, timeout):
     for r in rows_in:
         download(r)
     (REPO / rel_in).write_text(json.dumps(unit_in, ensure_ascii=False, indent=1), encoding="utf-8")
-    prompt = build_prompt(work, rel_in, rel_out, pas, len(items))
+    prompt = build_prompt(work, rel_in, rel_out, pas, len(items), retry=att > 0)
     t0 = time.time()
     cmd = ["codex", "exec", "-m", model, "-c", f'model_reasoning_effort="{effort}"', "--ignore-user-config",
            "-s", "workspace-write", "-C", str(REPO), "-"]
@@ -193,7 +195,7 @@ def run_work(unit, pas, rows_in, model, effort, prompt_sha, dry, timeout):
     with lock:
         counts = phrase_counts()
     try:
-        res = validate(unit_in, unit_out, log, counts, secs)
+        res = validate(unit_in, unit_out, log, counts, secs, enforce_min=(att < MAX_ATTEMPTS - 1))
     except Exception as e:  # 한 단위의 이상한 산출물이 전체 실행을 멈추지 않게
         rec.update(verdict="validator_error", n_accepted=0, error=repr(e)[:200])
         with lock:
