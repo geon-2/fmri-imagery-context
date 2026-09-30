@@ -44,3 +44,7 @@ venv/
 .DS_Store
 .vscode/
 .idea/
+
+# --- 임시 파일 ---
+.tmp_*/
+~$*
