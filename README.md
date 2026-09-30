@@ -14,11 +14,32 @@ perception fMRI와 공유 분산이 큰 저차원 축(k개)을 뇌 정렬 기준
 | ID | 질문 | 역할 |
 |---|---|---|
 | RQ1 | Object 정보를 넘어, perception fMRI와 context embedding이 공유하는 저차원 축이 있는가 | 사전 확인 |
-| RQ2 | 그 뇌 정렬 k축이 같은 차원의 뇌 비정렬 k축보다 imagery로 더 잘 전이되는가 | **주 가설** |
+| RQ2 | 그 뇌 정렬 k축이 같은 차원의 뇌 비정렬 축보다 imagery로 더 잘 전이되는가 | **주 가설** |
 | RQ3 | 기억 관련 영역을 더하면 추가 이득이 있는가 | 추가 실험 |
 
 전 단계에 **사전 점검**(context embedding과 뇌 반응의 공유 정보 유무를 RSA·encoding 예측력으로 확인)이 있다.
-자세한 배경, 선행연구 비교, 방법론적 함정과 대응은 Notion 연구 노트를 참고한다.
+자세한 배경, 선행연구 비교, 방법론적 함정과 대응은 Notion 연구 노트를 참고한다(`docs/links.md`).
+
+## 현재 진행 상황 (2026-09-30)
+
+지금까지의 작업은 대부분 **맥락 라벨을 만드는 일**이었다. 축을 찾으려면 이미지마다 맥락이 먼저 붙어 있어야 하기 때문이다.
+
+| 단계 | 상태 |
+|---|---|
+| 후보 이미지 풀 (NSD 35,977장) 확정, 이미지 다운로드 | 완료 |
+| 맥락 라벨 기준 (6개 항목, 다중 라벨, 독립 샘플) | 완료 |
+| 파일럿 300장, 사람 라벨 200장 | 완료 (자동 라벨과의 비교는 예정) |
+| 자동 라벨링 파이프라인 | 완료, **1만 장 라벨링 끝** (이후 추가 진행 중) |
+| 라벨 → 문장 embedding, 사전 점검(RQ1) | 시작 전 |
+| 축 추출, decoder, imagery 평가(RQ2, RQ3) | 시작 전 (`src/axes`, `src/decoding`, `src/eval`은 비어 있음) |
+
+## 처음 보는 분께: 어디부터 보면 되나
+
+1. **[docs/labeling_pipeline.md](docs/labeling_pipeline.md)** — 라벨을 어떻게 만들었는지, 어떤 시행착오를 거쳤는지, 결과가 어떤지. 가장 먼저 읽으면 된다.
+2. **[.claude/agents/context-classify.md](.claude/agents/context-classify.md)** — 라벨링에 쓴 프롬프트(현재 v10). 파일 안 `prompt_version`이 버전이다.
+3. **[src/labeling/run_scale.py](src/labeling/run_scale.py)**, **[validate_unit.py](src/labeling/validate_unit.py)** — 단위별로 라벨링을 실행하고, 결과를 자동으로 검사해서 통과분만 저장하는 코드.
+4. **[results/tables/](results/tables)** — 결과 요약 표(라벨 값 분포, 파일럿 요약 등).
+5. **[CLAUDE.md](CLAUDE.md)** — 작업 규칙(라벨 원칙, 커밋·데이터 규칙). 자동화 도구에게 주는 지침이지만 프로젝트의 약속이 정리돼 있다.
 
 ## 데이터
 
@@ -26,28 +47,25 @@ perception fMRI와 공유 분산이 큰 저차원 축(k개)을 뇌 정렬 기준
 - **NSD-Imagery** (Kneeland et al., CVPR 2025): imagery 평가 데이터.
 
 두 데이터셋 모두 Natural Scenes Dataset Data Use Agreement를 따른다.
-**원본·가공 데이터는 이 저장소에 절대 커밋하지 않는다** (`.gitignore` 참고). `data/` 아래 폴더는
-로컬에서만 채우고, 다른 사람이 재현하려면 각자 DUA에 동의 후 원본에서 내려받아야 한다.
+**원본·가공 데이터는 이 저장소에 없다** (`.gitignore` 참고). `data/` 아래 폴더는 로컬에서만 채우고,
+다른 사람이 재현하려면 각자 DUA에 동의한 뒤 원본에서 내려받아야 한다.
 
 ## 저장소 구조
 
 ```
-data/
-  raw/         # NSD 원본 (git 추적 안 함, 로컬 전용)
-  processed/   # beta, ROI 마스킹 결과 등 (git 추적 안 함)
-  labels/      # object/context 라벨·캡션 변형 (git 추적 안 함, 원본은 아래 참고)
-notebooks/     # 탐색적 분석
+.claude/agents/   # 라벨링 프롬프트 (classify가 현재 사용, critique·adjudicate는 파일럿에서 사용)
+data/             # 로컬 전용 (git 추적 안 함)
+  raw/            #   NSD·COCO 원본, 이미지
+  processed/      #   후보 풀, 파일럿 목록 등
+  labels/         #   라벨링 결과와 기록
+docs/             # 라벨링 파이프라인 설명, 사람 라벨링 가이드, 발표 자료
 src/
-  labeling/    # context 4차원 정의, 닫힌 어휘 생성, LLM 라벨링, 검증(사람 200장, COCO-Stuff·Places365 대조)
-  axes/        # 사전 점검(RSA·encoding) + 축 추출(PLS/RRR), PCA·무작위 기준선
-  decoding/    # ridge decoder 학습 (perception → k개 축 점수), imagery 적용
-  eval/        # 후보 순위 평가, permutation test, k-곡선
-configs/       # 실험 설정 (yaml)
-results/
-  figures/     # 파이프라인 산출 그림 (git 추적 안 함)
-  tables/      # 파이프라인 산출 표 (git 추적 안 함)
-docs/          # 설계 메모 등 이 저장소에 둘 문서 (긴 논의는 Notion이 원본)
-scripts/       # 실행 스크립트 (예: run_axes.py, run_eval.py)
+  labeling/       # 후보 풀 만들기, 라벨링 실행·검사, 결과 집계 (archive/는 폐기한 시도)
+  axes/           # (예정) 사전 점검(RSA·encoding) + 축 추출(PLS/RRR), PCA·무작위 기준선
+  decoding/       # (예정) ridge decoder 학습, imagery 적용
+  eval/           # (예정) 후보 순위 평가, permutation test, k-곡선
+results/tables/   # 요약 표(.md만 추적)
+configs/          # 실험 설정 (예정)
 ```
 
 ## 기록의 원천
@@ -62,15 +80,23 @@ scripts/       # 실행 스크립트 (예: run_axes.py, run_eval.py)
 ## 환경
 
 ```
-conda env create -f environment.yml   # 또는
-pip install -r requirements.txt
+conda env create -f environment.yml
 ```
 
-## 재현 순서
+라벨링 실행에는 Codex CLI 로그인(`codex exec`)도 필요하다.
 
-1. `src/labeling/` — context 라벨 생성·검증
-2. `src/axes/` — 사전 점검 → 축 추출 (PLS/RRR, PCA·무작위 기준선 포함)
-3. `src/decoding/` — decoder 학습 (NSD core만 사용, shared1000 제외) → NSD-Imagery 적용
-4. `src/eval/` — 후보 순위, permutation test, k-곡선
+## 라벨링 재현 순서
 
-각 단계의 정확한 커맨드는 `scripts/`에 스크립트가 추가되는 대로 이 섹션에 채운다.
+NSD·COCO 데이터를 `data/`에 준비했다는 전제다. 자세한 설명은 `docs/labeling_pipeline.md`.
+
+```
+python3 src/labeling/build_pool.py            # 후보 풀 (35,977장)
+python3 src/labeling/sample_pilot.py          # 파일럿 300장
+python3 src/labeling/extend_pilot.py          # 코어 1,000장
+python3 src/labeling/scale_queue.py --unit-size 50 --seed 1
+python3 src/labeling/download_pool.py
+python3 src/labeling/run_scale.py --pass 0 --units 0:20 --workers 3 --model gpt-5.5 --effort medium
+python3 src/labeling/report_stats.py          # 결과 수치
+```
+
+이후 단계(사전 점검 → 축 추출 → decoder → 평가)의 명령은 `scripts/`에 스크립트가 추가되는 대로 채운다.
