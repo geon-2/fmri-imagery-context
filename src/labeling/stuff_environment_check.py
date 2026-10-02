@@ -50,18 +50,21 @@ def auc(pos, neg):
     return (r[: len(pos)].sum() - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg))
 
 
-def main():
-    wave, split = {}, {}
+def load_all():
+    """라벨(environment 텍스트)과 이미지별 stuff 면적 비율을 읽는다. 면적은 캐시한다(주석 파일이 1GB를 넘어 느리다)."""
+    wave = {}
     for r in csv.DictReader(open(D / "queue_order.csv", encoding="utf-8")):
         wave[r["cocoId"]] = r["wave"]
-        split[r["cocoId"]] = r["cocoSplit"]
     env = {}
     for f in sorted(glob.glob(str(D / "accepted" / "u*_p0_*.json"))):
         d = json.load(open(f, encoding="utf-8"))
         for it in d["items"]:
             env[str(it["image_id"])] = " | ".join(v["value"].casefold() for v in it["labels"]["environment"])
     ids = set(env)
-
+    cache = D / "stuff_area_cache.json"
+    if cache.exists():
+        area = json.load(open(cache, encoding="utf-8"))
+        return wave, env, {k: defaultdict(float, v) for k, v in area.items() if k in ids}
     area = {}  # cocoId -> {stuff 이름: 이미지 면적 대비 비율}
     for sp in ("train", "val"):
         d = json.load(open(A / f"stuff_{sp}2017.json", encoding="utf-8"))
@@ -72,6 +75,13 @@ def main():
             if k in size:
                 area.setdefault(k, defaultdict(float))[name[a["category_id"]]] += a["area"] / size[k]
         del d
+    json.dump({k: dict(v) for k, v in area.items()}, open(cache, "w", encoding="utf-8"))
+    return wave, env, area
+
+
+def main():
+    wave, env, area = load_all()
+    ids = set(env)
     ids = sorted(i for i in ids if i in area)
 
     def frac(i, cats):
