@@ -240,11 +240,12 @@ def main():
     ap.add_argument("--max-billable-tokens", type=float, default=float("inf"))
     ap.add_argument("--timeout", type=int, default=3600)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--queue-file", default="queue_order.csv", help="BASE 안의 큐 파일(재현성 측정처럼 임의 이미지 목록을 돌릴 때)")
     a = ap.parse_args()
 
     cfg = json.load(open(BASE / "config.json"))
     U = cfg["unit_size"]
-    queue = load_queue()
+    queue = list(csv.DictReader(open(BASE / a.queue_file, encoding="utf-8")))
     s, e = map(int, a.units.split(":"))
     prompt_sha = hashlib.sha256(PROMPT_FILE.read_bytes()).hexdigest()[:12]
 

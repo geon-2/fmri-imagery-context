@@ -1,0 +1,21 @@
+"""영역 묶음(R1 nsdgeneral, R2 범주 선택 floc, R3 고수준 streams 5~7, EARLY streams 1)을 voxels.npz의 복셀 순서에 맞춰 저장한다.
+
+streams 라벨(NSD의 streams.mgz.ctab 확인): 1 early, 2 midventral, 3 midlateral, 4 midparietal, 5 ventral, 6 lateral, 7 parietal.
+출력: data/raw/nsd_fmri/subj01/roi_betas/roi_groups.npz
+"""
+import nibabel as nib
+import numpy as np
+
+R = "data/raw/nsd_fmri/subj01/"
+vox = np.load(R + "roi_betas/voxels.npz")
+idx = vox["flat_index"]
+load = lambda n: np.asanyarray(nib.load(R + f"roi/{n}.nii.gz").dataobj).ravel()[idx]
+streams = load("streams")
+g = {
+    "R1": load("nsdgeneral") > 0,
+    "R2": (load("floc-places") > 0) | (load("floc-faces") > 0) | (load("floc-bodies") > 0) | (load("floc-words") > 0),
+    "R3": np.isin(streams, [5, 6, 7]),
+    "EARLY": streams == 1,
+}
+np.savez(R + "roi_betas/roi_groups.npz", **g)
+print({k: int(v.sum()) for k, v in g.items()}, "복셀 총", len(idx))
