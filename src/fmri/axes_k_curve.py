@@ -140,8 +140,13 @@ def run(X, Y, masks, ks=KS, B=1000, seed=0, n_rand=3, log=print):
     se = float(np.std(full["fold_P"], ddof=1) / np.sqrt(len(folds)))
     tau = full["P"] - se
     kst = {m: kstar([c["P"] for c in curves[m]], tau, ks, d) for m in METHODS}
+    reached = {m: any(c["P"] >= tau for c in curves[m]) for m in METHODS}
     res = {"n_images": n, "n_voxels": int(Y.shape[1]), "dim": d, "ks": ks, "full": {"P": full["P"], "se": se},
-           "tau": tau, "kstar": kst, "deltaK": kst["PCA"] - kst["RRR"], "curves": {}}
+           "tau": tau, "kstar": kst, "kstar_reached_in_grid": reached, "deltaK": kst["PCA"] - kst["RRR"], "curves": {}}
+    if not reached["PCA"]:
+        # PCA·PLS·무작위는 축소 공간에서 OLS로 다시 적합하므로 ridge 전체 차원 성능에 격자 안에서 도달하지 못할 수 있다.
+        # 그때 k*=d는 도달 실패를 뜻하는 상한이라 ΔK는 하한(격자 최대 k − k*(RRR) 이상)으로만 읽는다. 같은 k에서의 RRR−PCA 차이(rrr_minus_pca)를 함께 본다.
+        res["deltaK_note"] = f"PCA는 격자(최대 k={max(ks)}) 안에서 기준 {tau:.4f}에 도달하지 못함: ΔK는 하한 {max(ks) - kst['RRR']}"
     for m in METHODS:
         res["curves"][m] = [{"k": k, "P": c["P"], "se": float(np.std(c["fold_P"], ddof=1) / np.sqrt(len(folds))),
                              **({"ci": [float(np.percentile(c["boot"], 2.5)), float(np.percentile(c["boot"], 97.5))]} if W is not None else {})}
@@ -282,8 +287,8 @@ def main():
     log = lambda s: print(s, flush=True)
     if a.confirm:
         ex = json.load(open(f"{name}.json"))
-        ks = {m: int(ex["kstar"][m]) for m in METHODS}
-        ks["RAND"] = ks["RRR"]  # 무작위는 RRR과 같은 k
+        # 모든 방법을 RRR의 k*에서 비교한다(PCA·PLS의 k*는 격자 안에서 전체 차원 ridge에 도달하지 못해 차원 d로 센 값이라 비교에 쓰지 않는다)
+        ks = {m: int(ex["kstar"]["RRR"]) for m in METHODS}
         res = confirm(Xtr, Ytr, Xte, Yte, masks, ks, B=a.boot, log=log)
         json.dump({"kstar_from_exploration": ks, **res}, open(f"{name}_confirm.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1, default=float)
         return
