@@ -35,7 +35,7 @@ def matched_perm(counts, seed):
 
 def build_sets(F, counts, seed=0):
     """F: {이름: N×d 또는 N×6×d(V3)}. 반환: {세트 이름: N×D 특징}. 셔플은 항목 수가 같은 이미지끼리 바꾼다."""
-    X = {k: (F[k].reshape(len(F[k]), -1) if k == "ctx_V3" else F[k]) for k in SINGLES}
+    X = {k: (F[k].reshape(len(F[k]), -1) if k == "ctx_V3" else F[k]) for k in SINGLES if k in F}
     p = {"orig": matched_perm(counts["orig"], seed + 1), "obj": matched_perm(counts["obj"], seed + 2),
          "ctx": matched_perm(counts["ctx"], seed + 3)}
     S = dict(X)
@@ -50,6 +50,34 @@ def build_sets(F, counts, seed=0):
 
 def primary(point, boot):
     return (point["R2"] + point["R3"]) / 2, (boot["R2"] + boot["R3"]) / 2
+
+
+def finish(res, boots):
+    """대비와 「맥락의 고유 기여」 판정(탐색과 확인이 같은 규칙을 쓴다)."""
+    def diff(a, b):
+        if a not in boots or b not in boots:
+            return None
+        d = boots[a] - boots[b]
+        return {"diff": float(res["P"][a]["P"] - res["P"][b]["P"]), "ci": [float(np.percentile(d, 2.5)), float(np.percentile(d, 97.5))]}
+
+    res["contrasts"] = {}
+    for v in ("P1", "V2"):
+        res["contrasts"][v] = {
+            "ctx_above_shuffle": diff(f"ctx_{v}", f"ctx_{v}_shuf"),
+            "obj_above_shuffle": diff(f"obj_{v}", f"obj_{v}_shuf"),
+            "orig_above_shuffle": diff(f"orig_{v}", f"orig_{v}_shuf"),
+            "ctx_unique_beyond_obj_raw": diff(f"obj_{v}+ctx_{v}", f"obj_{v}"),
+            "ctx_unique_beyond_obj_adj": diff(f"obj_{v}+ctx_{v}", f"obj_{v}+ctx_{v}_shuf"),
+            "obj_unique_beyond_ctx_raw": diff(f"obj_{v}+ctx_{v}", f"ctx_{v}"),
+            "joint_vs_orig": diff(f"obj_{v}+ctx_{v}", f"orig_{v}"),
+        }
+    ok = {}
+    for v in ("P1", "V2"):
+        c = res["contrasts"][v]["ctx_unique_beyond_obj_adj"]
+        ok[v] = bool(c and c["ci"][0] > 0 and c["diff"] >= EFFECT_FLOOR)
+    res["ctx_unique_claim"] = {"P1": ok["P1"], "V2": ok["V2"], "verdict": "확인됨(탐색)" if ok["P1"] and ok["V2"] else (
+        "구성에 의존" if ok["P1"] or ok["V2"] else "확인하지 못함")}
+    return res
 
 
 def run(Y, F, counts, masks, B=1000, seed=0, log=print, skip=()):
@@ -74,29 +102,33 @@ def run(Y, F, counts, masks, B=1000, seed=0, log=print, skip=()):
             ", ".join(f"{g}={pt[g]:.3f}" for g in GROUPS) + f"  ({time.time() - t:.0f}s)")
         del P
 
-    def diff(a, b):
-        if a not in boots or b not in boots:
-            return None
-        d = boots[a] - boots[b]
-        return {"diff": float(res["P"][a]["P"] - res["P"][b]["P"]), "ci": [float(np.percentile(d, 2.5)), float(np.percentile(d, 97.5))]}
+    return finish(res, boots)
 
-    res["contrasts"] = {}
-    for v in ("P1", "V2"):
-        res["contrasts"][v] = {
-            "ctx_above_shuffle": diff(f"ctx_{v}", f"ctx_{v}_shuf"),
-            "obj_above_shuffle": diff(f"obj_{v}", f"obj_{v}_shuf"),
-            "orig_above_shuffle": diff(f"orig_{v}", f"orig_{v}_shuf"),
-            "ctx_unique_beyond_obj_raw": diff(f"obj_{v}+ctx_{v}", f"obj_{v}"),
-            "ctx_unique_beyond_obj_adj": diff(f"obj_{v}+ctx_{v}", f"obj_{v}+ctx_{v}_shuf"),
-            "obj_unique_beyond_ctx_raw": diff(f"obj_{v}+ctx_{v}", f"ctx_{v}"),
-            "joint_vs_orig": diff(f"obj_{v}+ctx_{v}", f"orig_{v}"),
-        }
-    ok = {}
-    for v in ("P1", "V2"):
-        c = res["contrasts"][v]["ctx_unique_beyond_obj_adj"]
-        ok[v] = bool(c and c["ci"][0] > 0 and c["diff"] >= EFFECT_FLOOR)
-    res["ctx_unique_claim"] = {"P1": ok["P1"], "V2": ok["V2"], "verdict": "확인됨(탐색)" if ok["P1"] and ok["V2"] else (
-        "구성에 의존" if ok["P1"] or ok["V2"] else "확인하지 못함")}
+
+def confirm(Ytr, Ftr, ctr, Yte, Fte, cte, masks, B=1000, seed=0, log=print, skip=()):
+    """탐색 표본 전체로 적합하고 shared1000에서만 평가한다. 같은 세트·같은 판정 규칙을 쓴다(alpha는 학습 표본 안에서 선택).
+    셔플 대조는 학습과 평가 각각에서 항목 수가 같은 이미지끼리 바꾼다."""
+    from embedding_compare import choose_alpha, fit_predict
+    n = len(Yte)
+    W = boot_weights(n, B, seed + 10)
+    Yc = fold_center(Yte, [np.arange(n)])
+    Str, Ste = build_sets(Ftr, ctr, seed), build_sets(Fte, cte, seed)
+    res = {"n_images": n, "n_train": len(Ytr), "n_voxels": Yte.shape[1], "groups": {g: int(m.sum()) for g, m in masks.items()}, "encoding": {}, "P": {}}
+    boots = {}
+    for name in Str:
+        if name in skip:
+            continue
+        t = time.time()
+        Xtr, Xte = Str[name].astype(np.float32), Ste[name].astype(np.float32)
+        P = fold_center(fit_predict(Xtr, Ytr, Xte, choose_alpha(Xtr, Ytr, np.random.default_rng(seed + 1))), [np.arange(n)])
+        pt, bt = encoding_scores(P, Yc, masks, W)
+        pp, pb = primary(pt, bt)
+        res["encoding"][name] = pt
+        res["P"][name] = {"P": float(pp), "ci": [float(np.percentile(pb, 2.5)), float(np.percentile(pb, 97.5))]}
+        boots[name] = pb
+        log(f"[confirm] {name:22s} P={pp:.4f} ci=[{res['P'][name]['ci'][0]:.4f}, {res['P'][name]['ci'][1]:.4f}]  ({time.time() - t:.0f}s)")
+    res = finish(res, boots)
+    res["ctx_unique_claim"]["verdict"] = res["ctx_unique_claim"]["verdict"].replace("(탐색)", "(확인, shared1000)")
     return res
 
 
@@ -141,7 +173,8 @@ def load_features(emb_dir, model, ids_all, wanted):
     F = {}
     for k in ("orig_P1", "orig_V2", "obj_P1", "obj_V2", "ctx_P1", "ctx_V2"):
         F[k] = np.load(emb_dir / f"{model}__{k}.npy").astype(np.float32)[sel]
-    F["ctx_V3"] = np.load(emb_dir / f"{model}__ctx_V3.npz")["blocks"].astype(np.float32)[sel]
+    if (emb_dir / f"{model}__ctx_V3.npz").exists():
+        F["ctx_V3"] = np.load(emb_dir / f"{model}__ctx_V3.npz")["blocks"].astype(np.float32)[sel]
     return F
 
 
@@ -176,6 +209,12 @@ def selftest():
     F2 = dict(F); F2["ctx_P1"] = noise(); F2["ctx_V2"] = noise()
     res2 = run(Y, F2, counts, masks, B=40, seed=1, skip=("ctx_V3",))
     assert res2["ctx_unique_claim"]["verdict"] != "확인됨(탐색)", res2["ctx_unique_claim"]
+    # 확인: 학습/평가를 나눠도 같은 판정
+    tr, te = slice(0, 350), slice(350, 500)
+    sl = lambda D, i: {k: v[i] for k, v in D.items()}
+    rc = confirm(Y[tr], sl(F, tr), sl(counts, tr), Y[te], sl(F, te), sl(counts, te), masks, B=40, seed=1, skip=("ctx_V3",), log=lambda s: None)
+    assert rc["contrasts"]["P1"]["ctx_above_shuffle"]["diff"] > 0.03, rc["contrasts"]["P1"]["ctx_above_shuffle"]
+    print("confirm 시험:", json.dumps(rc["ctx_unique_claim"], ensure_ascii=False))
     print("selftest 통과")
 
 
@@ -188,6 +227,7 @@ def main():
     ap.add_argument("--model", default="MPNet")
     ap.add_argument("--boot", type=int, default=1000)
     ap.add_argument("--skip", default="", help="건너뛸 세트 이름(쉼표). 시간이 걸리는 ctx_V3를 빼려면 ctx_V3")
+    ap.add_argument("--confirm", action="store_true", help="shared1000에서 확인(탐색 표본으로 적합). 탐색을 끝낸 뒤에만")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -199,6 +239,17 @@ def main():
     ids_all = json.load(open(Path(a.emb_dir) / "ctx_ids.json"))
     train, Ytr, test, Yte, masks, nkeep, nvox = load_brain(a.fmri_dir, ids_all)
     print(f"학습용(탐색) 이미지 {len(train)}장, 평가용 shared1000 중 라벨 있는 {len(test)}장, 복셀 {nkeep}/{nvox}, 영역 { {g: int(m.sum()) for g, m in masks.items()} }", flush=True)
+    if a.confirm:
+        res = confirm(Ytr, load_features(a.emb_dir, a.model, ids_all, train), item_counts(cap, lab, train),
+                      Yte, load_features(a.emb_dir, a.model, ids_all, test), item_counts(cap, lab, test),
+                      masks, B=a.boot, log=lambda s: print(s, flush=True), skip=tuple(x for x in a.skip.split(",") if x))
+        res.update(model=a.model, n_reliable_voxels=nkeep, n_voxels_total=nvox)
+        out = Path(a.out_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        json.dump(res, open(out / f"text_compare_{a.model}_confirm.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1, default=float)
+        print("\n맥락의 고유 기여(확인, shared1000):", res["ctx_unique_claim"])
+        print(json.dumps(res["contrasts"], ensure_ascii=False, indent=1, default=float))
+        return
     F = load_features(a.emb_dir, a.model, ids_all, train)
     counts = item_counts(cap, lab, train)
     res = run(Ytr, F, counts, masks, B=a.boot, log=lambda s: print(s, flush=True), skip=tuple(x for x in a.skip.split(",") if x))
