@@ -263,6 +263,7 @@ def main():
     ap.add_argument("--rep", default="ctx_P1", help="ctx_P1(주) 또는 ctx_V2(보조)")
     ap.add_argument("--out-dir", default=".")
     ap.add_argument("--tag", default="subj01")
+    ap.add_argument("--roi", default=None, help="한 영역만으로 적합·평가(예: places, faces, bodies, words, S_early, S_ventral, EARLY). 없으면 R2∪R3")
     ap.add_argument("--boot", type=int, default=1000)
     ap.add_argument("--learning-curve", action="store_true")
     ap.add_argument("--stab-boot", type=int, default=0, help="하위공간 안정성 부트스트랩 횟수(0이면 건너뜀)")
@@ -274,16 +275,18 @@ def main():
     from text_compare import load_brain
     emb = Path(a.emb_dir)
     ids_all = json.load(open(emb / "ctx_ids.json"))
-    train, Ytr, test, Yte, masks, nkeep, nvox = load_brain(a.fmri_dir, ids_all)
-    keep = masks["R2"] | masks["R3"]
+    train, Ytr, test, Yte, masks, nkeep, nvox = load_brain(a.fmri_dir, ids_all, extra=(a.roi,) if a.roi else ())
+    keep = masks[a.roi] if a.roi else masks["R2"] | masks["R3"]
     Ytr, Yte, masks = Ytr[:, keep], Yte[:, keep], {g: m[keep] for g, m in masks.items()}
+    if a.roi:
+        masks = {"R2": np.ones(int(keep.sum()), bool), "R3": np.ones(int(keep.sum()), bool)}  # 점수는 이 영역 복셀의 median r
     row = {c: i for i, c in enumerate(ids_all)}
     E = np.load(emb / f"{a.model}__{a.rep}.npy").astype(np.float32)
     Xtr, Xte = E[[row[c] for c in train]], E[[row[c] for c in test]]
-    print(f"{a.tag}: 탐색 {len(train)}장, shared1000 {len(test)}장, 복셀(R2∪R3) {int(keep.sum())}, 차원 {Xtr.shape[1]}", flush=True)
+    print(f"{a.tag}: 탐색 {len(train)}장, shared1000 {len(test)}장, 복셀({a.roi or "R2∪R3"}) {int(keep.sum())}, 차원 {Xtr.shape[1]}", flush=True)
     out = Path(a.out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    name = out / f"axes_{a.tag}_{a.model}_{a.rep}"
+    name = out / f"axes_{a.tag}_{a.model}_{a.rep}{'_' + a.roi if a.roi else ''}"
     log = lambda s: print(s, flush=True)
     if a.confirm:
         ex = json.load(open(f"{name}.json"))

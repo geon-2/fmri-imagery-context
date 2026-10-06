@@ -132,13 +132,13 @@ def confirm(Ytr, Ftr, ctr, Yte, Fte, cte, masks, B=1000, seed=0, log=print, skip
     return res
 
 
-def load_brain(fmri_dir, ctx_ids):
+def load_brain(fmri_dir, ctx_ids, extra=()):
     """라벨이 있는 이미지만 쓴다. 학습용 = shared1000을 뺀 이미지, 평가용(shared1000)은 확인 단계에서 따로 쓴다."""
     fmri_dir = Path(fmri_dir)
     tm = list(csv.DictReader(open(fmri_dir / "trial_map.csv", encoding="utf-8")))
     groups = np.load(fmri_dir / "roi_groups.npz")
     allmask = np.zeros(len(groups["R1"]), bool)
-    for g in GROUPS:
+    for g in tuple(GROUPS) + tuple(extra):
         allmask |= groups[g]
     Yz = np.empty((len(tm), int(allmask.sum())), np.float32)
     for s in range(1, 41):
@@ -161,7 +161,7 @@ def load_brain(fmri_dir, ctx_ids):
     Ytr = Yz[Ttr].mean(1)[:, keep]
     Tte = np.array([trials[c] for c in test])
     Yte = Yz[Tte].mean(1)[:, keep]
-    masks = {g: groups[g][allmask][keep] for g in GROUPS}
+    masks = {g: groups[g][allmask][keep] for g in tuple(GROUPS) + tuple(extra)}
     return train, Ytr, test, Yte, masks, int(keep.sum()), int(allmask.sum())
 
 

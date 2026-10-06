@@ -20,5 +20,10 @@ g = {
     "R3": np.isin(streams, [5, 6, 7]),
     "EARLY": streams == 1,
 }
+# 세부 영역(영역별 분석용): 범주 선택 영역 각각과 streams 단계별
+for n in ("places", "faces", "bodies", "words"):
+    g[n] = load(f"floc-{n}") > 0
+for i, n in enumerate(("S_early", "S_midventral", "S_midlateral", "S_midparietal", "S_ventral", "S_lateral", "S_parietal"), 1):
+    g[n] = streams == i
 np.savez(R + "roi_betas/roi_groups.npz", **g)
 print({k: int(v.sum()) for k, v in g.items()}, "복셀 총", len(idx))
