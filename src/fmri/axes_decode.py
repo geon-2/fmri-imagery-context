@@ -74,10 +74,13 @@ def topk(Sm, k):
     return float((rank < k).mean())
 
 
-def axis_corr(Zhat, Ztrue, k=12):
+def axis_corr_vec(Zhat, Ztrue, k=12):
     a, b = Zhat[:, :k] - Zhat[:, :k].mean(0), Ztrue[:, :k] - Ztrue[:, :k].mean(0)
-    r = (a * b).sum(0) / (np.sqrt((a ** 2).sum(0) * (b ** 2).sum(0)) + 1e-12)
-    return float(r.mean())
+    return (a * b).sum(0) / (np.sqrt((a ** 2).sum(0) * (b ** 2).sum(0)) + 1e-12)
+
+
+def axis_corr(Zhat, Ztrue, k=12):
+    return float(axis_corr_vec(Zhat, Ztrue, k).mean())
 
 
 def evaluate(Zhat, Ztrue, cols, boot=0, seed=0):
@@ -194,7 +197,7 @@ def targets_main(S_ids, dirs, rand):
     return np.concatenate(Zs, axis=1).astype(np.float32), cols
 
 
-def run_roi(S_tr, Y_tr, S_te, Y_te, masks, pool_mask, nvox=400, draws=5, B=1000, seed=0, log=print, rois=None):
+def run_roi(S_tr, Y_tr, S_te, Y_te, masks, pool_mask, nvox=400, draws=5, B=1000, seed=0, log=print, rois=None, pred_path=None):
     """축(방향)은 pool_mask 복셀로 학습 이미지에서 구해 고정하고, 입력 복셀만 영역별로 바꿔(영역마다 nvox개 무작위, draws회) 해독한다."""
     rois = rois or list(masks)
     d = S_tr.shape[1]
@@ -207,6 +210,7 @@ def run_roi(S_tr, Y_tr, S_te, Y_te, masks, pool_mask, nvox=400, draws=5, B=1000,
     allm = dict(masks)
     allm["POOL"] = pool_mask
     per = {}
+    preds = {}
     for r in list(rois) + ["POOL"]:
         cand = np.flatnonzero(allm[r])
         zh = []
@@ -214,16 +218,20 @@ def run_roi(S_tr, Y_tr, S_te, Y_te, masks, pool_mask, nvox=400, draws=5, B=1000,
             pick = np.random.default_rng(seed + 31 * dd + 5).choice(cand, min(nvox, len(cand)), replace=False)
             zh.append(decode(Y_tr[:, pick], Z_tr, Y_te[:, pick], seed + dd))
         res = {"n_voxels_available": int(len(cand)), "n_voxels_used": int(min(nvox, len(cand)))}
+        preds[r] = np.mean([z[:, cols["RRR"]] for z in zh], axis=0)
         boots = {}
         for m in METHODS:
             sl = cols[m]
-            res[m] = {"axis_corr": float(np.mean([axis_corr(z[:, sl], Z_te[:, sl], KMAIN) for z in zh]))}
+            res[m] = {"axis_corr": float(np.mean([axis_corr(z[:, sl], Z_te[:, sl], KMAIN) for z in zh])),
+                      "axis_corr_each": [float(x) for x in np.mean([axis_corr_vec(z[:, sl], Z_te[:, sl], KMAIN) for z in zh], axis=0)]}
             tops = [sim_matrix(z[:, sl], Z_te[:, sl]) for z in zh]
             res[m]["top1"] = float(np.mean([topk(S, 1) for S in tops]))
             res[m]["top5"] = float(np.mean([topk(S, 5) for S in tops]))
             boots[m] = np.array([np.mean([axis_corr(z[i][:, sl], Z_te[i][:, sl], KMAIN) for z in zh]) for i in idxs]) if B else None
         per[r] = {"res": res, "boots": boots}
         log(f"  {r:14s} 복셀 {res['n_voxels_used']:4d}  축 상관 RRR {res['RRR']['axis_corr']:.3f} PCA {res['PCA']['axis_corr']:.3f} RAND {res['RAND']['axis_corr']:.3f} | 1등 RRR {res['RRR']['top1']:.3f} PCA {res['PCA']['top1']:.3f}")
+    if pred_path:
+        np.savez(pred_path, truth=Z_te[:, cols["RRR"]], **{f"pred_{r}": v for r, v in preds.items()})
     out = {"rois": {r: per[r]["res"] for r in per}, "nvox": nvox, "draws": draws, "n_test": n}
     if B:
         def ci(v):
@@ -271,6 +279,7 @@ def main():
     ap.add_argument("--boot", type=int, default=1000)
     ap.add_argument("--skip-existing", action="store_true")
     ap.add_argument("--roi-mode", action="store_true", help="영역별 decoding(복셀 수를 맞춰 영역마다 따로 해독)")
+    ap.add_argument("--pred-out", default=None, help="영역별 해독 값(npz)과 확인 이미지 id(json)를 저장할 경로 접두사")
     ap.add_argument("--nvox", type=int, default=400)
     ap.add_argument("--draws", type=int, default=5)
     ap.add_argument("--selftest", action="store_true")
@@ -293,7 +302,10 @@ def main():
     if a.roi_mode:
         print(f"{a.tag} {a.model}: 영역별 decoding, 학습 {len(train)}장, 확인 {len(test)}장, 영역당 복셀 {a.nvox}개 x {a.draws}회", flush=True)
         res = run_roi(S[[row[c] for c in train]], Ytr, S[[row[c] for c in test]], Yte, {r: masks[r] for r in ROIS_DEC}, keep,
-                      nvox=a.nvox, draws=a.draws, B=a.boot, log=lambda s: print(s, flush=True))
+                      nvox=a.nvox, draws=a.draws, B=a.boot, log=lambda s: print(s, flush=True),
+                      pred_path=(a.pred_out + ".npz") if a.pred_out else None)
+        if a.pred_out:
+            json.dump(test, open(a.pred_out + "_ids.json", "w"))
         res.update(tag=a.tag, model=a.model, rep=a.rep)
         save_json(res, out)
         print("H1:", res["H1_high_minus_EARLY"], "\nH2:", res["H2_RRR_minus_PCA_mean_over_rois"], flush=True)
