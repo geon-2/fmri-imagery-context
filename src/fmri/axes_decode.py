@@ -174,7 +174,90 @@ def selftest():
     Yn = rng.standard_normal((n, V)).astype(np.float32)
     rn = run(S[:600], Yn[:600], S[600:], Yn[600:], B=10, n_folds=3, log=lambda s: None)
     assert abs(rn["explore"]["RRR_k3"]["pair_acc"] - 0.5) < 0.06, rn["explore"]["RRR_k3"]
+    selftest_roi()
     print("selftest 통과")
+
+
+# ---------- 영역별 decoding (기준은 Notion 「영역별 brain decoding」에 계산 전 기록) ----------
+ROIS_DEC = ["EARLY", "S_midventral", "S_midlateral", "S_midparietal", "S_ventral", "S_lateral", "S_parietal", "places", "faces", "bodies", "words"]
+HIGH = ["S_ventral", "S_lateral", "S_parietal", "places", "bodies"]
+
+
+def targets_main(S_ids, dirs, rand):
+    """RRR, PCA, 무작위의 처음 KMAIN축 좌표."""
+    Zs, cols, c = [], {}, 0
+    for m in METHODS:
+        D = rand if m == "RAND" else dirs[m]
+        Zs.append(S_ids @ D[:, :KMAIN])
+        cols[m] = slice(c, c + KMAIN)
+        c += KMAIN
+    return np.concatenate(Zs, axis=1).astype(np.float32), cols
+
+
+def run_roi(S_tr, Y_tr, S_te, Y_te, masks, pool_mask, nvox=400, draws=5, B=1000, seed=0, log=print, rois=None):
+    """축(방향)은 pool_mask 복셀로 학습 이미지에서 구해 고정하고, 입력 복셀만 영역별로 바꿔(영역마다 nvox개 무작위, draws회) 해독한다."""
+    rois = rois or list(masks)
+    d = S_tr.shape[1]
+    rand = np.linalg.qr(np.random.default_rng(seed + 100).standard_normal((d, KMAX)))[0]
+    dirs = fit_dirs(S_tr, Y_tr[:, pool_mask], seed)
+    Z_tr, cols = targets_main(S_tr, dirs, rand)
+    Z_te, _ = targets_main(S_te, dirs, rand)
+    n = len(S_te)
+    idxs = [np.random.default_rng(seed + 7 + b).integers(0, n, n) for b in range(B)]
+    allm = dict(masks)
+    allm["POOL"] = pool_mask
+    per = {}
+    for r in list(rois) + ["POOL"]:
+        cand = np.flatnonzero(allm[r])
+        zh = []
+        for dd in range(draws):
+            pick = np.random.default_rng(seed + 31 * dd + 5).choice(cand, min(nvox, len(cand)), replace=False)
+            zh.append(decode(Y_tr[:, pick], Z_tr, Y_te[:, pick], seed + dd))
+        res = {"n_voxels_available": int(len(cand)), "n_voxels_used": int(min(nvox, len(cand)))}
+        boots = {}
+        for m in METHODS:
+            sl = cols[m]
+            res[m] = {"axis_corr": float(np.mean([axis_corr(z[:, sl], Z_te[:, sl], KMAIN) for z in zh]))}
+            tops = [sim_matrix(z[:, sl], Z_te[:, sl]) for z in zh]
+            res[m]["top1"] = float(np.mean([topk(S, 1) for S in tops]))
+            res[m]["top5"] = float(np.mean([topk(S, 5) for S in tops]))
+            boots[m] = np.array([np.mean([axis_corr(z[i][:, sl], Z_te[i][:, sl], KMAIN) for z in zh]) for i in idxs]) if B else None
+        per[r] = {"res": res, "boots": boots}
+        log(f"  {r:14s} 복셀 {res['n_voxels_used']:4d}  축 상관 RRR {res['RRR']['axis_corr']:.3f} PCA {res['PCA']['axis_corr']:.3f} RAND {res['RAND']['axis_corr']:.3f} | 1등 RRR {res['RRR']['top1']:.3f} PCA {res['PCA']['top1']:.3f}")
+    out = {"rois": {r: per[r]["res"] for r in per}, "nvox": nvox, "draws": draws, "n_test": n}
+    if B:
+        def ci(v):
+            return [float(np.percentile(v, 2.5)), float(np.percentile(v, 97.5))]
+        hi = [r for r in HIGH if r in per]
+        if hi and "EARLY" in per:
+            h1 = np.mean([per[r]["boots"]["RRR"] for r in hi], axis=0) - per["EARLY"]["boots"]["RRR"]
+            h1_pt = float(np.mean([per[r]["res"]["RRR"]["axis_corr"] for r in hi]) - per["EARLY"]["res"]["RRR"]["axis_corr"])
+            out["H1_high_minus_EARLY"] = {"diff": h1_pt, "ci": ci(h1), "met": bool(ci(h1)[0] > 0 and h1_pt >= 0.03)}
+        h2 = np.mean([per[r]["boots"]["RRR"] - per[r]["boots"]["PCA"] for r in rois], axis=0)
+        h2_pt = float(np.mean([per[r]["res"]["RRR"]["axis_corr"] - per[r]["res"]["PCA"]["axis_corr"] for r in rois]))
+        out["H2_RRR_minus_PCA_mean_over_rois"] = {"diff": h2_pt, "ci": ci(h2), "met": bool(ci(h2)[0] > 0 and h2_pt >= 0.03)}
+        out["RRR_minus_PCA_by_roi"] = {r: {"diff": float(per[r]["res"]["RRR"]["axis_corr"] - per[r]["res"]["PCA"]["axis_corr"]), "ci": ci(per[r]["boots"]["RRR"] - per[r]["boots"]["PCA"])} for r in per}
+    return out
+
+
+def selftest_roi():
+    rng = np.random.default_rng(0)
+    n, d, V = 1200, 24, 200
+    L = rng.standard_normal((n, d)) * np.linspace(3.0, 0.3, d)
+    A = np.linalg.qr(rng.standard_normal((d, d)))[0]
+    S = (L @ A).astype(np.float32)
+    S = (S - S.mean(0)) / S.std(0)
+    W = rng.standard_normal((3, 100))
+    sig = L[:, -3:] @ W * 4.0 + rng.standard_normal((n, 100)) * 2.0
+    Y = np.concatenate([sig, rng.standard_normal((n, 100)) * 2.0], axis=1).astype(np.float32)
+    masks = {"A": np.arange(200) < 100, "B": np.arange(200) >= 100}
+    pool = np.arange(200) < 100
+    global KMAIN, KMAX
+    KMAIN, KMAX = 3, 5
+    r = run_roi(S[:800], Y[:800], S[800:], Y[800:], masks, pool, nvox=50, draws=2, B=20, log=lambda s: None, rois=["A", "B"])
+    a, b = r["rois"]["A"]["RRR"]["axis_corr"], r["rois"]["B"]["RRR"]["axis_corr"]
+    print("영역 시험: 정보 있는 영역 %.3f, 잡음 영역 %.3f" % (a, b))
+    assert a > b + 0.2 and abs(b) < 0.15
 
 
 def main():
@@ -187,11 +270,14 @@ def main():
     ap.add_argument("--tag", default="subj01")
     ap.add_argument("--boot", type=int, default=1000)
     ap.add_argument("--skip-existing", action="store_true")
+    ap.add_argument("--roi-mode", action="store_true", help="영역별 decoding(복셀 수를 맞춰 영역마다 따로 해독)")
+    ap.add_argument("--nvox", type=int, default=400)
+    ap.add_argument("--draws", type=int, default=5)
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
-    out = Path(a.out_dir) / f"axes_decode_{a.tag}_{a.model}_{a.rep}.json"
+    out = Path(a.out_dir) / f"axes_decode{'_roi' if a.roi_mode else ''}_{a.tag}_{a.model}_{a.rep}.json"
     if a.skip_existing and out.exists():
         print("이미 있음, 건너뜀:", out)
         return
@@ -201,8 +287,17 @@ def main():
     E = np.load(emb / f"{a.model}__{a.rep}.npy").astype(np.float32)
     S = (E - E.mean(0)) / (E.std(0) + 1e-6)
     row = {c: i for i, c in enumerate(ids_all)}
-    train, Ytr, test, Yte, masks, nk, nv = load_brain(a.fmri_dir, ids_all)
+    extra = tuple(r for r in ROIS_DEC if r not in ("EARLY",)) if a.roi_mode else ()
+    train, Ytr, test, Yte, masks, nk, nv = load_brain(a.fmri_dir, ids_all, extra=extra)
     keep = masks["R2"] | masks["R3"]
+    if a.roi_mode:
+        print(f"{a.tag} {a.model}: 영역별 decoding, 학습 {len(train)}장, 확인 {len(test)}장, 영역당 복셀 {a.nvox}개 x {a.draws}회", flush=True)
+        res = run_roi(S[[row[c] for c in train]], Ytr, S[[row[c] for c in test]], Yte, {r: masks[r] for r in ROIS_DEC}, keep,
+                      nvox=a.nvox, draws=a.draws, B=a.boot, log=lambda s: print(s, flush=True))
+        res.update(tag=a.tag, model=a.model, rep=a.rep)
+        save_json(res, out)
+        print("H1:", res["H1_high_minus_EARLY"], "\nH2:", res["H2_RRR_minus_PCA_mean_over_rois"], flush=True)
+        return
     print(f"{a.tag} {a.model}: 학습 {len(train)}장, 확인 {len(test)}장, 복셀 {int(keep.sum())}", flush=True)
     res = run(S[[row[c] for c in train]], Ytr[:, keep], S[[row[c] for c in test]], Yte[:, keep], B=a.boot, log=lambda s: print(s, flush=True))
     res.update(tag=a.tag, model=a.model, rep=a.rep)
