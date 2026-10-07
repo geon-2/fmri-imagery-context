@@ -15,6 +15,8 @@
   지표: 정답의 백분위 순위(우연 0.5), 1등·5등 비율(우연 1/후보 수). 
   기준: C1 RRR 백분위의 구간 하한 > 0.5 가 4명 모두. C2 (RRR − PCA) ≥ 0.02 이고 구간 하한 > 0 인 피험자 2명 이상.
   참고(기준 없음): 무작위 5분할 탐색 결과(이전 axes_decode)의 1등 비율과 비교.
+[D] 학습 데이터 양 곡선(C와 같은 범주 단위 5분할, 학습 이미지를 25·50·75·100%만 사용, 100%는 C 결과)
+  기준: 「데이터에 민감」 = 4명 중 3명 이상에서 (RRR 1등 비율 100% − 50%) ≥ 0.01. 아니면 「거의 포화」. 곡선 모양(25→100%)과 RRR−PCA 백분위 차이도 함께 보고(기준 없음).
 부트스트랩 1,000회는 이미지 단위. 모든 판정은 MPNet 기준(CLIP은 하지 않음).
 사용: PYTHONPATH=src/labeling:src/fmri python3 src/fmri/axes_generalize.py [--parts A,B,C]   시험: --selftest
 """
@@ -155,7 +157,7 @@ def assign_folds(cats, n_folds=5):
     return fold_of, size
 
 
-def part_C(d, B, cat, log=print):
+def part_C(d, B, cat, log=print, frac=1.0):
     S_tr, Y_tr = d["Str"], d["Ytr"]
     cats = [cat[c] for c in d["train_ids"]]
     fold_of, size = assign_folds(cats)
@@ -169,6 +171,8 @@ def part_C(d, B, cat, log=print):
         t0 = time.time()
         te = np.flatnonzero(fold == f)
         tr = np.flatnonzero(fold != f)
+        if frac < 1.0:  # 학습 이미지를 무작위로 일부만(고정 시드, 비율이 커질수록 앞 비율을 포함)
+            tr = np.sort(np.random.default_rng(11 + f).permutation(tr)[:int(frac * len(tr))])
         dirs = fit_dirs(S_tr[tr], Y_tr[tr])
         Z_tr, cols = dc.targets(S_tr[tr], dirs, rand)
         Z_te, _ = dc.targets(S_tr[te], dirs, rand)
@@ -258,6 +262,24 @@ def main():
         dirs = {s: fit_dirs(data[s]["Xtr"], data[s]["Ytr"]) for s in SUBJ}
         res["A"] = part_A(data, dirs, a.boot, log)
         json.dump(res, open(a.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1, default=float)
+    if "D" in parts:
+        res.setdefault("D", {})
+        for s in SUBJ:
+            if s in res["D"]:
+                continue
+            d = {"Str": data[s]["Xtr"], "Ytr": data[s]["Ytr"], "Ste": data[s]["Xte"], "Yte": data[s]["Yte"], "train_ids": data[s]["train_ids"], "test_ids": data[s]["test_ids"]}
+            res["D"][s] = {}
+            for fr in (0.25, 0.5, 0.75):
+                r = part_C(d, a.boot, cat, log, frac=fr)
+                res["D"][s][str(fr)] = r
+                log(f"[D] {s} {int(fr * 100)}%: RRR 1등 {r['RRR']['top1']:.3f} 백분위 {r['RRR']['pct']:.3f} PCA 1등 {r['PCA']['top1']:.3f} 백분위 {r['PCA']['pct']:.3f}")
+                json.dump(res, open(a.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1, default=float)
+            res["D"][s]["1.0"] = res["C"][s]
+        gains = [res["D"][s]["1.0"]["RRR"]["top1"] - res["D"][s]["0.5"]["RRR"]["top1"] for s in SUBJ]
+        res["D_verdict"] = {"gain_100_minus_50_top1": gains, "n_ge_0.01": int(sum(g >= 0.01 for g in gains)), "data_sensitive": bool(sum(g >= 0.01 for g in gains) >= 3)}
+        json.dump(res, open(a.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1, default=float)
+        log("D 판정: " + json.dumps(res["D_verdict"], ensure_ascii=False))
+        return
     for key, fn in (("B", part_B), ("C", part_C)):
         if key not in parts:
             continue
