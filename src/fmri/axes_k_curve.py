@@ -26,6 +26,20 @@ import numpy as np
 import embedding_compare as ec
 
 KS = [1, 2, 3, 5, 8, 12, 20, 32, 50, 80, 128]
+
+
+def save_json(obj, path, **kw):
+    """결과 저장. Drive가 끊겨 쓰기에 실패하면 계산 결과를 잃지 않도록 /content/out_fallback에 대신 저장하고 알린다."""
+    path = Path(path)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        json.dump(obj, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1, default=float, **kw)
+        print("저장:", path, flush=True)
+    except OSError as e:
+        fb = Path("/content/out_fallback") / path.name
+        fb.parent.mkdir(parents=True, exist_ok=True)
+        json.dump(obj, open(fb, "w", encoding="utf-8"), ensure_ascii=False, indent=1, default=float, **kw)
+        print(f"!! {path} 저장 실패({e}). 대신 {fb}에 저장했다. Drive를 다시 마운트한 뒤 복사할 것.", flush=True)
 METHODS = ("RRR", "PLS", "PCA", "RAND")
 
 
@@ -293,7 +307,7 @@ def main():
         # 모든 방법을 RRR의 k*에서 비교한다(PCA·PLS의 k*는 격자 안에서 전체 차원 ridge에 도달하지 못해 차원 d로 센 값이라 비교에 쓰지 않는다)
         ks = {m: int(ex["kstar"]["RRR"]) for m in METHODS}
         res = confirm(Xtr, Ytr, Xte, Yte, masks, ks, B=a.boot, log=log)
-        json.dump({"kstar_from_exploration": ks, **res}, open(f"{name}_confirm.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1, default=float)
+        save_json({"kstar_from_exploration": ks, **res}, f"{name}_confirm.json")
         return
     res = run(Xtr, Ytr, masks, B=a.boot, log=log)
     if a.learning_curve:
@@ -301,8 +315,7 @@ def main():
         res["learning_curve"] = learning_curve(Xtr, Ytr, masks, sizes, log=log)
     if a.stab_boot:
         res["stability"] = subspace_stability(Xtr, Ytr, [k for k in KS if k <= 50], B=a.stab_boot, log=log)
-    json.dump(res, open(f"{name}.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1, default=float)
-    print("저장:", f"{name}.json")
+    save_json(res, f"{name}.json")
 
 
 if __name__ == "__main__":

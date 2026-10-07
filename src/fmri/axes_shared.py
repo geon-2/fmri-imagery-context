@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 import embedding_compare as ec
-from axes_k_curve import Scorer, overlap, predict_dir, ridge_dirs
+from axes_k_curve import Scorer, overlap, predict_dir, ridge_dirs, save_json
 
 KS = (5, 12, 20, 32)
 STOP = set("a an the of in on at to and or with for from by is are was be as it its this that their there into near next than very some one two more most while being has have had".split())
@@ -211,12 +211,12 @@ def main():
                   " ".join(f"{n}={v['P']:.3f}" for n, v in r.items() if n.startswith("from_") and "_minus_" not in n), flush=True)
     out = Path(a.out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    json.dump(res, open(out / f"axes_shared_{a.model}_{a.rep}.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1, default=float)
+    save_json(res, out / f"axes_shared_{a.model}_{a.rep}.json")
     # 해석
     cap = {r["cocoId"]: r for r in map(json.loads, gzip.open(Path(a.bundle_dir) / "captions.jsonl.gz", "rt"))}
     lab = {r["cocoId"]: r for r in map(json.loads, gzip.open(Path(a.bundle_dir) / "labels_pass0.jsonl.gz", "rt"))}
     interp = interpret(S, ids_all, lab, cap, D[a.interpret]["RRR"], k=a.k)
-    json.dump({"subject": a.interpret, "k": a.k, "directions": interp}, open(out / f"axes_interpret_{a.interpret}_{a.model}_{a.rep}.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    save_json({"subject": a.interpret, "k": a.k, "directions": interp}, out / f"axes_interpret_{a.interpret}_{a.model}_{a.rep}.json")
     for it in interp[:4]:
         print(f"\n== 방향 {it['direction']}: 높은 쪽 예시")
         for e in it["top"][:3]:

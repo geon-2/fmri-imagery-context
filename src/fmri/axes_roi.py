@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 
 import embedding_compare as ec
-from axes_k_curve import run
+from axes_k_curve import run, save_json
 from axes_shared import fit_dirs, orth, overlap, summarize_transfer, transfer_scores, within_split_half
 from text_compare import load_brain
 
@@ -75,7 +75,7 @@ def main():
             " ".join(f"{n[5:]}={v['P']:.3f}" for n, v in r.items() if n.startswith("from_") and "_minus_" not in n))
     out = Path(a.out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    json.dump(res, open(out / f"axes_roi_{a.tag}_{a.model}_{a.rep}.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1, default=float)
+    save_json(res, out / f"axes_roi_{a.tag}_{a.model}_{a.rep}.json")
     log("\n영역별 요약(점수는 그 영역 복셀의 median r):")
     log(f"{'ROI':14s} {'복셀':>6s} {'full P':>7s} {'k*RRR':>6s} {'RRR k=5':>8s} {'RRR k=12':>9s} {'PCA k=12':>9s} {'반분할겹침 k=12':>15s}")
     for r in names:

@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 
 import embedding_compare as ec
+from axes_k_curve import save_json
 from axes_shared import fit_dirs
 from text_compare import load_brain
 
@@ -97,15 +98,18 @@ def main():
     R = (T - pred).astype(np.float32)
     frac_removed = float(1 - R.var(0).sum() / T.var(0).sum())
     log(f"D2 맥락 임베딩 분산 중 사물 정보로 선형 예측되는 비율 {frac_removed:.2f}")
-    np.save(emb / f"{a.model}__ctxres_P1.npy", R.astype(np.float16))
+    try:
+        np.save(emb / f"{a.model}__ctxres_P1.npy", R.astype(np.float16))
+    except OSError as e:  # Drive가 끊겼을 때
+        fb = Path("/content/out_fallback"); fb.mkdir(parents=True, exist_ok=True)
+        np.save(fb / f"{a.model}__ctxres_P1.npy", R.astype(np.float16))
+        print(f"!! {emb}에 저장 실패({e}); /content/out_fallback에 저장했다. 이 파일을 embeddings_v2로 복사해야 k 곡선 셀이 읽는다.", flush=True)
     res["D2"] = {"fraction_ctx_variance_predicted_by_objects": frac_removed, "saved": f"{a.model}__ctxres_P1.npy"}
     # 대조: 맥락 임베딩 대비 잔차의 코사인(평균)
     cos = float(np.mean((E * R).sum(1) / (np.linalg.norm(E, axis=1) * np.linalg.norm(R, axis=1) + 1e-9)))
     res["D2"]["mean_cosine_ctx_vs_residual"] = cos
     log(f"   맥락과 잔차 임베딩의 평균 코사인 {cos:.2f}")
-    outd = Path(a.out_dir)
-    outd.mkdir(parents=True, exist_ok=True)
-    json.dump(res, open(outd / f"axes_object_{a.tag}_{a.model}_{a.rep}.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    save_json(res, Path(a.out_dir) / f"axes_object_{a.tag}_{a.model}_{a.rep}.json")
 
 
 if __name__ == "__main__":
