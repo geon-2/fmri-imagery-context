@@ -63,7 +63,11 @@ def main():
     ap.add_argument("--k", type=int, default=12)
     ap.add_argument("--out-dir", default=".")
     ap.add_argument("--tag", default="subj01")
+    ap.add_argument("--skip-existing", action="store_true")
     a = ap.parse_args()
+    if a.skip_existing and (Path(a.out_dir) / f"axes_object_{a.tag}_{a.model}_{a.rep}.json").exists() and (Path(a.emb_dir) / f"{a.model}__ctxres_P1.npy").exists():
+        print("이미 있음, 건너뜀:", a.model)
+        return
     emb = Path(a.emb_dir)
     ids = json.load(open(emb / "ctx_ids.json"))
     cap = {r["cocoId"]: r for r in map(json.loads, gzip.open(Path(a.bundle_dir) / "captions.jsonl.gz", "rt"))}

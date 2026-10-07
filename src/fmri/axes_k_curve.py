@@ -282,10 +282,15 @@ def main():
     ap.add_argument("--learning-curve", action="store_true")
     ap.add_argument("--stab-boot", type=int, default=0, help="하위공간 안정성 부트스트랩 횟수(0이면 건너뜀)")
     ap.add_argument("--confirm", action="store_true", help="shared1000 확인(탐색 결과 json의 k*를 읽는다). 탐색을 먼저 끝낸 뒤에만")
+    ap.add_argument("--skip-existing", action="store_true", help="결과 json이 이미 있으면 건너뜀(런타임이 끊긴 뒤 이어서 돌릴 때)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
+    _out = Path(a.out_dir) / f"axes_{a.tag}_{a.model}_{a.rep}{'_' + a.roi if a.roi else ''}"
+    if a.skip_existing and not a.confirm and Path(f"{_out}.json").exists():
+        print("이미 있음, 건너뜀:", f"{_out}.json")
+        return
     from text_compare import load_brain
     emb = Path(a.emb_dir)
     ids_all = json.load(open(emb / "ctx_ids.json"))

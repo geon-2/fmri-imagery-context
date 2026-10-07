@@ -36,8 +36,22 @@ def main():
     ap.add_argument("--rois", default=",".join(ROIS))
     ap.add_argument("--min-voxels", type=int, default=150)
     ap.add_argument("--boot", type=int, default=200)
+    ap.add_argument("--skip-existing", action="store_true", help="최종 결과가 있으면 건너뛰고, 중간 체크포인트가 있으면 끝난 영역·전이 대상은 다시 계산하지 않는다")
     a = ap.parse_args()
     rois = a.rois.split(",")
+    outdir = Path(a.out_dir)
+    final = outdir / f"axes_roi_{a.tag}_{a.model}_{a.rep}.json"
+    ckpt = outdir / f"axes_roi_{a.tag}_{a.model}_{a.rep}.ckpt.json"
+    if a.skip_existing and final.exists():
+        print("이미 있음, 건너뜀:", final)
+        return
+    done = {"rois": {}, "transfer": {}}
+    if a.skip_existing and ckpt.exists():
+        try:
+            done = json.load(open(ckpt))
+            print(f"체크포인트 사용: 영역 {len(done['rois'])}개, 전이 {len(done['transfer'])}개 이미 계산됨", flush=True)
+        except (OSError, ValueError):
+            pass
     emb = Path(a.emb_dir)
     ids_all = json.load(open(emb / "ctx_ids.json"))
     E = np.load(emb / f"{a.model}__{a.rep}.npy").astype(np.float32)
@@ -56,26 +70,36 @@ def main():
         Yr = Ytr[:, masks[r]]
         data[r] = Yr
         full_mask = {"R2": np.ones(n, bool), "R3": np.ones(n, bool)}
+        if r in done["rois"]:
+            log(f"===== {r} ({n}복셀) 체크포인트에서 불러옴")
+            res["rois"][r] = done["rois"][r]
+            res["rois"][r]["split_half"] = {int(k): v for k, v in res["rois"][r]["split_half"].items()}
+            continue
         log(f"===== {r} ({n}복셀)")
         k_res = run(X, Yr, full_mask, B=a.boot, log=log, n_rand=1)
         res["rois"][r] = {"n_voxels": n, "full_P": k_res["full"]["P"], "kstar": k_res["kstar"], "curves": k_res["curves"],
                           "rrr_minus_pca": k_res.get("rrr_minus_pca"), "split_half": within_split_half(X, Yr, KS)}
+        save_json({"rois": res["rois"], "transfer": done["transfer"]}, ckpt)
     names = list(data)
     D = {r: fit_dirs(X, data[r]) for r in names}
     res["overlap"] = {k: {f"{x}|{y}": overlap(orth(D[x]["RRR"], k), orth(D[y]["RRR"], k)) for i, x in enumerate(names) for y in names[i + 1:]} for k in KS}
     res["transfer"] = {}
     for b in names:
+        if b in done["transfer"]:
+            log(f"전이 대상 {b} 체크포인트에서 불러옴")
+            res["transfer"][b] = {int(k): v for k, v in done["transfer"][b].items()}
+            continue
         src = {s: D[s]["RRR"] for s in names if s != b}
         log(f"전이 대상 {b}")
         out = transfer_scores(src, (X, data[b]), KS, {"R2": np.ones(data[b].shape[1], bool), "R3": np.ones(data[b].shape[1], bool)}, B=a.boot, log=lambda s: None)
         res["transfer"][b] = summarize_transfer(out)
+        done["transfer"][b] = res["transfer"][b]
+        save_json({"rois": res["rois"], "transfer": done["transfer"]}, ckpt)
         k = 12
         r = res["transfer"][b][k]
         log(f"  k={k}: own_RRR={r['own_RRR']['P']:.3f} own_PCA={r['own_PCA']['P']:.3f} RAND={r['RAND']['P']:.3f} | " +
             " ".join(f"{n[5:]}={v['P']:.3f}" for n, v in r.items() if n.startswith("from_") and "_minus_" not in n))
-    out = Path(a.out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    save_json(res, out / f"axes_roi_{a.tag}_{a.model}_{a.rep}.json")
+    save_json(res, final)
     log("\n영역별 요약(점수는 그 영역 복셀의 median r):")
     log(f"{'ROI':14s} {'복셀':>6s} {'full P':>7s} {'k*RRR':>6s} {'RRR k=5':>8s} {'RRR k=12':>9s} {'PCA k=12':>9s} {'반분할겹침 k=12':>15s}")
     for r in names:
