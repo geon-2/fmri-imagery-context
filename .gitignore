@@ -48,3 +48,9 @@ venv/
 # --- 임시 파일 ---
 .tmp_*/
 ~$*
+
+# 로컬 분석용(임베딩, 작업 폴더, 결과, 로그)
+data/embeddings_v2/
+data/stage/
+data/results/
+data/logs/
