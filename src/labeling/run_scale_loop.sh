@@ -1,6 +1,6 @@
 #!/bin/zsh
 # run_scale.py를 남은 이미지가 없을 때까지 반복 실행한다. 사용량 한도나 일시 오류로 멈추면 30분 뒤 이어서 한다.
-# 진전이 3번 연속 없으면(체계적 문제) 멈춘다. 이미 통과한 이미지는 run_scale.py가 건너뛴다.
+# 진전이 12번 연속(약 6시간) 없으면(체계적 문제) 멈춘다. 이미 통과한 이미지는 run_scale.py가 건너뛴다.
 cd "$(dirname "$0")/../.." || exit 1
 LOG=data/logs/run_scale_loop.log
 remaining() {
@@ -23,6 +23,6 @@ for i in $(seq 1 60); do
   after=$(remaining)
   if [ "$after" -ge "$before" ]; then stall=$((stall+1)); else stall=0; fi
   echo "$(date '+%F %T') 반복 $i 종료, 남은 이미지 $after, 진전없음 연속 $stall" >> $LOG
-  [ "$stall" -ge 3 ] && { echo "$(date '+%F %T') 진전 없음 3회, 중단" >> $LOG; break; }
+  [ "$stall" -ge 12 ] && { echo "$(date '+%F %T') 진전 없음 12회, 중단" >> $LOG; break; }
   sleep 1800
 done
