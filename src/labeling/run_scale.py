@@ -17,6 +17,7 @@ import glob
 import hashlib
 import json
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -138,6 +139,23 @@ def build_prompt(work, rel_in, rel_out, sample_idx, n, retry=False):
     )
 
 
+def run_isolated(cmd, prompt, timeout):
+    """codex는 node 래퍼가 자식을 띄우므로 subprocess.run의 timeout이 손자 프로세스를 못 죽여 무한 대기할 수 있다(10/9 실측: 4~5시간 정체).
+    새 프로세스 그룹으로 띄우고 시간 초과 시 그룹 전체를 종료한다."""
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=REPO,
+                         start_new_session=True)
+    try:
+        out, err = p.communicate(input=prompt, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        p.communicate()
+        raise
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+
+
 def run_work(unit, pas, rows_in, model, effort, prompt_sha, dry, timeout):
     att = attempts(unit, pas)
     work = f"u{unit:05d}_p{pas}_a{att}"
@@ -158,7 +176,7 @@ def run_work(unit, pas, rows_in, model, effort, prompt_sha, dry, timeout):
            "-s", "workspace-write", "-C", str(REPO), "-"]
     proc = None
     try:
-        proc = subprocess.run(cmd, input=prompt, text=True, capture_output=True, timeout=timeout, cwd=REPO)
+        proc = run_isolated(cmd, prompt, timeout)
         status = "ok" if proc.returncode == 0 else f"exit{proc.returncode}"
     except subprocess.TimeoutExpired:
         status = "timeout"
@@ -238,7 +256,7 @@ def main():
     ap.add_argument("--model", default="gpt-5.5")
     ap.add_argument("--effort", default="medium")
     ap.add_argument("--max-billable-tokens", type=float, default=float("inf"))
-    ap.add_argument("--timeout", type=int, default=3600)
+    ap.add_argument("--timeout", type=int, default=2700)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--queue-file", default="queue_order.csv", help="BASE 안의 큐 파일(재현성 측정처럼 임의 이미지 목록을 돌릴 때)")
     a = ap.parse_args()
