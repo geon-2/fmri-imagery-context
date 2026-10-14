@@ -24,11 +24,11 @@ IMG_TARGETS = ("clip_img", "dinov2", "resnet50")
 TEXT_TARGETS = ("orig_P1", "obj_P1", "ctx_P1")
 
 
-def embed_images(ids, img_dir, out_dir, bs=32):
+def embed_images(ids, img_dir, out_dir, bs=32, prefix="IMG"):
     import torch
     from PIL import Image
     out_dir = Path(out_dir)
-    cache = {k: out_dir / f"IMG__{k}.npy" for k in IMG_TARGETS}
+    cache = {k: out_dir / f"{prefix}__{k}.npy" for k in IMG_TARGETS}
     if all(p.exists() for p in cache.values()) and np.load(cache["clip_img"]).shape[0] == len(ids):
         return {k: np.load(p) for k, p in cache.items()}
     from transformers import AutoImageProcessor, AutoModel, CLIPImageProcessor, CLIPModel

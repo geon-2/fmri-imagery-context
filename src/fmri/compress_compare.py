@@ -64,8 +64,15 @@ def load_targets(a, ids_all, train, cap, lab):
     F.pop("ctx_V3", None)
     S = build_sets(F, counts, 0)
     T = {r: S[r].astype(np.float32) for r in ("orig_P1", "obj_P1", "ctx_P1")}
-    for k in IMG:
-        T[k] = np.load(Path(a.emb_dir) / f"IMG__{k}.npy").astype(np.float32)
+    allp = {k: Path(a.emb_dir) / f"IMGALL__{k}.npy" for k in IMG}
+    if all(p.exists() for p in allp.values()):          # 전체 이미지 임베딩(ctx_ids.json 순서)에서 피험자 학습 이미지만 골라 쓴다
+        row = {c: i for i, c in enumerate(ids_all)}
+        sel = [row[c] for c in train]
+        for k in IMG:
+            T[k] = np.load(allp[k])[sel].astype(np.float32)
+    else:
+        for k in IMG:
+            T[k] = np.load(Path(a.emb_dir) / f"IMG__{k}.npy").astype(np.float32)
     return T
 
 
