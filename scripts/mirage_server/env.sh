@@ -14,11 +14,12 @@ export USE_RETRIEVAL=${USE_RETRIEVAL:-0}                # 1이면 retrieval pool
 export N_IMG=${N_IMG:-1}
 export GEN_REP=${GEN_REP:-1}
 export MODEL_NAME=${MODEL_NAME:-subj0${SUBJ}_${NUM_SESSIONS}sess_server_ridge_sc2}
+# (디스크가 꽉 찬 노드(u3)에서 환경만 설치할 때는 실행 전에 UV_CACHE_DIR 등을 NAS 경로로 지정하면 이 기본값을 덮어쓴다)
 # 튜토리얼 5·6: /home(~/.cache 등)에 큰 파일 금지 -> 모든 캐시를 노드 로컬로
-export XDG_CACHE_HOME=/local_datasets/$USER/xdg_cache
-export TORCH_HOME=/local_datasets/$USER/torch
-export PIP_CACHE_DIR=/local_datasets/$USER/pip_cache
-export UV_CACHE_DIR=/local_datasets/$USER/uv_cache
+export XDG_CACHE_HOME=${XDG_CACHE_HOME:-/local_datasets/$USER/xdg_cache}
+export TORCH_HOME=${TORCH_HOME:-/local_datasets/$USER/torch}
+export PIP_CACHE_DIR=${PIP_CACHE_DIR:-/local_datasets/$USER/pip_cache}
+export UV_CACHE_DIR=${UV_CACHE_DIR:-/local_datasets/$USER/uv_cache}
 mkdir -p "$XDG_CACHE_HOME" "$TORCH_HOME" "$PIP_CACHE_DIR" "$UV_CACHE_DIR" 2>/dev/null || true
 # Private Anaconda 경로(튜토리얼 3). Public(/data/opt/anaconda3)에는 절대 설치하지 않는다.
 export CONDA=/data/$USER/anaconda3/bin/conda
