@@ -3,7 +3,15 @@
 set -eo pipefail
 source "$(dirname "$0")/env.sh"
 mkdir -p /data/$USER/envs
-[ -x "$PY" ] || /data/$USER/anaconda3/bin/conda create -y -p "$ENV_DIR" python=3.10
+# 네트워크 확인(노드에서 외부 접속이 막혀 있을 수 있음)
+curl -sI https://pypi.org | head -1; curl -sI https://huggingface.co | head -1
+if [ ! -x "$CONDA" ]; then
+  echo "❌ Private Anaconda가 없습니다: $CONDA"
+  echo "   이 서버(NAS)에는 설치가 안 되어 있습니다. 먼저 00_install_anaconda.sh 를 실행하세요(튜토리얼 3, 16~21쪽 절차)."
+  exit 1
+fi
+case "$CONDA" in /data/opt/*) echo "❌ Public Anaconda에는 설치 금지(튜토리얼 3, 15쪽)"; exit 1;; esac
+[ -x "$PY" ] || $CONDA create -y -p "$ENV_DIR" python=3.10
 $PY -m pip -q install uv
 CONS=/data/$USER/envs/constraints.txt
 cat > $CONS <<'CEOF'
@@ -28,5 +36,6 @@ $U --no-deps git+https://github.com/openai/CLIP.git || echo "WARN CLIP"
 $U dalle2-pytorch || echo "WARN dalle2"
 $U wandb==0.16.2 evaluate==0.4.1 nltk==3.8.1 rouge_score==0.1.2 opencv-python==4.8.1.78 || echo "WARN optional"
 $U "huggingface-hub>=0.23.2,<1.0" "protobuf<5"
-$PY -m ipykernel install --user --name mei-env --display-name "mei-env (py3.10)"
+# 커널 스펙을 /home이 아니라 환경(NAS) 안에 설치: 노드의 홈에 의존하지 않음
+$PY -m ipykernel install --prefix "$ENV_DIR" --name mei-env --display-name "mei-env (py3.10)"
 $PY -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '')"

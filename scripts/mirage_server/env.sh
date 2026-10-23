@@ -14,3 +14,11 @@ export USE_RETRIEVAL=${USE_RETRIEVAL:-0}                # 1이면 retrieval pool
 export N_IMG=${N_IMG:-1}
 export GEN_REP=${GEN_REP:-1}
 export MODEL_NAME=${MODEL_NAME:-subj0${SUBJ}_${NUM_SESSIONS}sess_server_ridge_sc2}
+# 튜토리얼 5·6: /home(~/.cache 등)에 큰 파일 금지 -> 모든 캐시를 노드 로컬로
+export XDG_CACHE_HOME=/local_datasets/$USER/xdg_cache
+export TORCH_HOME=/local_datasets/$USER/torch
+export PIP_CACHE_DIR=/local_datasets/$USER/pip_cache
+export UV_CACHE_DIR=/local_datasets/$USER/uv_cache
+mkdir -p "$XDG_CACHE_HOME" "$TORCH_HOME" "$PIP_CACHE_DIR" "$UV_CACHE_DIR" 2>/dev/null || true
+# Private Anaconda 경로(튜토리얼 3). Public(/data/opt/anaconda3)에는 절대 설치하지 않는다.
+export CONDA=/data/$USER/anaconda3/bin/conda
