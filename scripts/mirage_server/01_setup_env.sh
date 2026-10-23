@@ -34,6 +34,7 @@ $U git+https://github.com/ildoonet/pytorch-gradual-warmup-lr.git || echo "WARN g
 $U git+https://github.com/pabloppp/pytorch-tools || echo "WARN pytorch-tools"
 $U --no-deps git+https://github.com/openai/CLIP.git || echo "WARN CLIP"
 $U dalle2-pytorch || echo "WARN dalle2"
+$U insightface==0.7.3 opencv-python==4.8.1.78 onnxruntime==1.16.3 onnx2torch==1.5.13 || echo "WARN insightface"   # StableCascade/modules/controlnet.py가 import함(Colab 노트북에서 설치했던 줄, 서버 스크립트에서 빠뜨렸음)
 $U wandb==0.16.2 evaluate==0.4.1 nltk==3.8.1 rouge_score==0.1.2 opencv-python==4.8.1.78 || echo "WARN optional"
 $U "huggingface-hub>=0.23.2,<1.0" "protobuf<5"
 # 커널 스펙을 /home이 아니라 환경(NAS) 안에 설치: 노드의 홈에 의존하지 않음

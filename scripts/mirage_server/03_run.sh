@@ -6,6 +6,7 @@ export PYTHONNOUSERSITE=1
 cd $ROOT/src
 STAGE=${STAGE:-all}
 echo "== $STAGE | $MODEL_NAME | host $(hostname) | $(date)"; nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+$PY $SCRIPTS/deps_probe.py   # 누락 모듈 자동 설치(최초 1회는 설치가 일어날 수 있음)
 if [[ $STAGE == smoke ]]; then
   $PY - <<PYE
 import sys, os, time, torch
