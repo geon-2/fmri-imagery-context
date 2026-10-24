@@ -13,7 +13,9 @@ export CAPTION_TYPE=${CAPTION_TYPE:-medium}
 export USE_RETRIEVAL=${USE_RETRIEVAL:-0}                # 1이면 retrieval pool(논문 구성요소), N_IMG는 8의 배수여야 함
 export N_IMG=${N_IMG:-1}
 export GEN_REP=${GEN_REP:-1}
-export MODEL_NAME=${MODEL_NAME:-subj0${SUBJ}_${NUM_SESSIONS}sess_server_ridge_sc2}
+_SUF=""; [ "$USE_RETRIEVAL" = "1" ] && _SUF="_ret${N_IMG}"           # retrieval 설정은 모델/결과 폴더가 겹치지 않게 이름에 붙임
+export MODEL_NAME=${MODEL_NAME:-subj0${SUBJ}_${NUM_SESSIONS}sess_server_ridge_sc2${_SUF}}
+export RECON_BS=${RECON_BS:-1}                           # 후보 생성 배치(12GB GPU 보호)
 # (디스크가 꽉 찬 노드(u3)에서 환경만 설치할 때는 실행 전에 UV_CACHE_DIR 등을 NAS 경로로 지정하면 이 기본값을 덮어쓴다)
 # 튜토리얼 5·6: /home(~/.cache 등)에 큰 파일 금지 -> 모든 캐시를 노드 로컬로
 export XDG_CACHE_HOME=${XDG_CACHE_HOME:-/local_datasets/$USER/xdg_cache}
