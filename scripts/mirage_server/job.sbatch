@@ -2,7 +2,7 @@
 #SBATCH -J mirage
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-gpu=8
-#SBATCH --mem-per-gpu=32G
+#SBATCH --mem-per-gpu=64G
 #SBATCH -p batch_ugrad_advisor_x
 #SBATCH -w moana-u4
 #SBATCH -t 1-0
