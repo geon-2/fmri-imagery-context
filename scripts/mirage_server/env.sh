@@ -23,3 +23,4 @@ export UV_CACHE_DIR=${UV_CACHE_DIR:-/local_datasets/$USER/uv_cache}
 mkdir -p "$XDG_CACHE_HOME" "$TORCH_HOME" "$PIP_CACHE_DIR" "$UV_CACHE_DIR" 2>/dev/null || true
 # Private Anaconda 경로(튜토리얼 3). Public(/data/opt/anaconda3)에는 절대 설치하지 않는다.
 export CONDA=/data/$USER/anaconda3/bin/conda
+export LEAN_RIDGE=${LEAN_RIDGE:-0}                    # 1이면 메모리 절약 릿지(lean_ridge.py) 사용. 서버에서 selftest_lean.py로 sklearn과 대조한 뒤에만 사용

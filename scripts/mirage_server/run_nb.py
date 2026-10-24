@@ -28,10 +28,41 @@ def run_nb(path,out):
                         print(f"❌ 첫 오류: 셀 {i}\n"+"".join(c["source"])[:800]); print("---\n"+o["ename"]+": "+o["evalue"][:600]); print("\n".join(o["traceback"])[-2500:])
         print("오류 셀 수:",bad)
     return bad if os.path.exists(outp) else (r.returncode or 1)
+LEAN_CELL = r'''
+# [lean ridge] 원본 릿지 셀을 메모리 절약 구현으로 교체(수식은 sklearn Ridge와 같음. scripts/mirage_server/lean_ridge.py)
+import sys, os, gc, pickle, time
+sys.path.insert(0, os.environ["SCRIPTS"])
+from lean_ridge import lean_ridge
+del train_images; gc.collect()          # 임베딩을 다 만든 뒤에는 필요 없음(40세션이면 약 18GB)
+start = time.time()
+def _fit(name, Y, X):
+    t0 = time.time(); print(f"lean ridge: {name} Y={tuple(Y.shape)}", flush=True)
+    coef, icpt = lean_ridge(X, Y.reshape(len(Y), -1), weight_decay, device="cuda")
+    with open(f"{outdir}/ridge_{name}_weights.pkl", "wb") as f: pickle.dump({"coef": coef, "intercept": icpt}, f)
+    print(f"  saved ridge_{name}_weights.pkl coef{coef.shape} {coef.dtype}, {time.time()-t0:.0f}s", flush=True)
+    del coef, icpt; gc.collect()
+_fit("image", clip_image_train, x_train); del clip_image_train
+if dual_guidance: _fit("text", clip_text_train, x_train); del clip_text_train
+if blurry_recon: _fit("blurry", vae_image_train, x_train); del vae_image_train
+if retrieval:
+    import torch
+    _fit("retrieval", retrieval_image_train, torch.nn.functional.normalize(x_train, p=2, dim=1)); del retrieval_image_train
+assert not prompt_recon, "lean ridge는 prompt_recon을 지원하지 않음"
+print(f"Elapsed training time for {model_name}: {time.strftime('%H:%M:%S', time.gmtime(time.time() - start))}")
+'''
+def use_lean_ridge(nb_path):
+    nb = json.load(open(nb_path)); hit = 0
+    for c in nb["cells"]:
+        if c["cell_type"] == "code" and "Training Ridge Image model" in "".join(c["source"]):
+            c["source"] = LEAN_CELL.strip().splitlines(keepends=True); hit += 1
+    assert hit == 1, f"릿지 셀을 찾지 못함({hit})"
+    json.dump(nb, open(nb_path, "w")); print("lean ridge 셀로 교체")
 which=sys.argv[1]
 if which=="train":
     args=(f"--data_path=../dataset/ --cache_dir=../cache/ --model_name={MODEL} --subj={SUBJ} --num_sessions={NS} --caption_type {os.environ['CAPTION_TYPE']} "+" ".join(common))
-    patch_notebook(f"{SRC}/Train.ipynb",f"{SRC}/Train_srv.ipynb",args); rc=run_nb("Train_srv.ipynb","Train_srv_out.ipynb")
+    patch_notebook(f"{SRC}/Train.ipynb",f"{SRC}/Train_srv.ipynb",args)
+    if os.environ.get("LEAN_RIDGE")=="1": use_lean_ridge(f"{SRC}/Train_srv.ipynb")
+    rc=run_nb("Train_srv.ipynb","Train_srv_out.ipynb")
 else:
     args=(f"--data_path=../dataset --cache_dir=../cache --model_name={MODEL} --subj={SUBJ} --mode imagery --gen_rep={os.environ['GEN_REP']} "
           f"--num_images_per_sample={os.environ['N_IMG']} --num_trial_reps=16 --no-compile_models "+" ".join(common))
