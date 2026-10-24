@@ -25,5 +25,5 @@ PYE
 fi
 [[ $STAGE == train || $STAGE == all ]] && { $PY $SCRIPTS/run_nb.py train; $PY $SCRIPTS/link_embeddings.py; ls $ROOT/train_logs/$MODEL_NAME; }
 [[ $STAGE == recon || $STAGE == all ]] && { $PY $SCRIPTS/link_embeddings.py; $PY $SCRIPTS/run_nb.py recon; }
-[[ $STAGE == viz || $STAGE == recon || $STAGE == all ]] && { $PY $SCRIPTS/viz.py; cp -r $ROOT/src/evals/$MODEL_NAME $RESULTS/ 2>/dev/null || true; }
+[[ $STAGE == viz || $STAGE == recon || $STAGE == all ]] && { cp -r $ROOT/src/evals/$MODEL_NAME $RESULTS/ 2>/dev/null || true; $PY $SCRIPTS/viz.py; }   # 결과 복사를 먼저(viz가 실패해도 결과는 NAS에 남김)
 echo "== 끝 $(date)"
