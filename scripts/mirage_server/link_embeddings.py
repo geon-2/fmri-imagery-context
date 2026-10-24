@@ -2,7 +2,10 @@
 import glob, os, re
 ROOT=os.environ["ROOT"]; SUBJ=os.environ["SUBJ"]
 pre=f"{ROOT}/dataset/preprocessed_data/subject{SUBJ}"
+NS=float(os.environ["NUM_SESSIONS"])
 for f in sorted(glob.glob(f"{pre}/*_embeddings_train_*sess.pt")):
+    m=re.search(r"_train_([\d.]+)sess\.pt$",f)
+    if float(m.group(1))!=NS: continue          # 다른 세션 수의 임베딩은 연결하지 않음(여러 설정이 공존할 때 잘못 연결되는 것을 막음)
     dst=re.sub(r"_train_[\d.]+sess\.pt$","_train.pt",f)
     if os.path.lexists(dst): os.remove(dst)
     os.symlink(f,dst); print("link:",os.path.basename(dst))
