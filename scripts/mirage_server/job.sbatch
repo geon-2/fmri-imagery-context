@@ -8,5 +8,5 @@
 #SBATCH -t 1-0
 #SBATCH -o logs/slurm-%A.out
 # 제출: sbatch --export=ALL,STAGE=train job.sbatch   (STAGE: smoke|train|recon|viz|all). 제출 위치 아래에 logs/ 폴더가 있어야 함.
-cd "$(dirname "$(readlink -f "$0")")"
+cd /data/$USER/mirage_server   # sbatch는 스크립트를 임시 위치로 복사해 실행하므로 자기 위치 탐색이 안 됨(실측: 03_run.sh를 못 찾음)
 bash 03_run.sh
