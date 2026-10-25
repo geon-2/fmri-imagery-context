@@ -45,6 +45,13 @@ def feats_clip(x):
     assert f.shape[-1] == 768, f"CLIP ViT-L/14의 투영 임베딩(768)이 아님: {tuple(f.shape)}"
     return f
 
+def per_stim_two_way(f_gt, f_rec):
+    n = len(f_gt)
+    a = (f_gt - f_gt.mean(1, keepdim=True)); a = a / a.norm(dim=1, keepdim=True)
+    b = (f_rec - f_rec.mean(1, keepdim=True)); b = b / b.norm(dim=1, keepdim=True)
+    c = a @ b.T; d = c.diag()
+    return np.array([(d[i] > torch.cat([c[i, :i], c[i, i + 1:]])).float().mean().item() for i in range(n)])
+
 def two_way(f_gt, f_rec):
     """f_gt, f_rec: (n,d). 정답 i와 재구성 j의 피어슨 상관 행렬에서, 대각(i,i)이 같은 행의 다른 열(i,j)보다 큰 비율의 평균."""
     n = len(f_gt)

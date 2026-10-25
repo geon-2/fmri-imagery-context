@@ -65,7 +65,7 @@ if which=="train":
     rc=run_nb("Train_srv.ipynb","Train_srv_out.ipynb")
 else:
     args=(f"--data_path=../dataset --cache_dir=../cache --model_name={MODEL} --subj={SUBJ} --mode imagery --gen_rep={os.environ['GEN_REP']} "
-          f"--num_images_per_sample={os.environ['N_IMG']} --num_trial_reps=16 --no-compile_models "+" ".join(common))
+          f"--num_images_per_sample={os.environ['N_IMG']} --num_trial_reps=16 --no-compile_models "+(f"--seed={os.environ['SEED']} " if os.environ.get("SEED") else "")+" ".join(common))
     patch_notebook(f"{SRC}/recon_inference_mi.ipynb",f"{SRC}/recon_srv.ipynb",args)
     # retrieval pool: 원본은 8장씩 한 번에 생성(n_samples=8)한다. 12GB GPU에서는 배치 8이 메모리를 넘길 수 있어 RECON_BS(기본 1)장씩 나눠 생성(후보 수는 그대로)
     BS=os.environ.get("RECON_BS","1"); nb=json.load(open(f"{SRC}/recon_srv.ipynb")); hit=0

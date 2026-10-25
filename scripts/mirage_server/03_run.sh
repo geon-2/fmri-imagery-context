@@ -24,6 +24,11 @@ for k in (6,7):
 PYE
 fi
 [[ $STAGE == train || $STAGE == all ]] && { $PY $SCRIPTS/run_nb.py train; $PY $SCRIPTS/link_embeddings.py; ls $ROOT/train_logs/$MODEL_NAME; }
-[[ $STAGE == recon || $STAGE == all ]] && { $PY $SCRIPTS/link_embeddings.py; $PY $SCRIPTS/run_nb.py recon; }
+[[ $STAGE == recon || $STAGE == all ]] && { $PY $SCRIPTS/link_embeddings.py; $PY $SCRIPTS/run_nb.py recon
+  if [[ -n "$SEED" ]]; then   # 시드를 바꿔 반복 생성: 결과 파일에 시드를 붙여 서로 덮어쓰지 않게 NAS로 복사
+    E=$ROOT/src/evals/$MODEL_NAME; mkdir -p $RESULTS/$MODEL_NAME
+    for f in $E/*_all_recons_imagery.pt $E/*_all_blurryrecons_imagery.pt; do cp $f $RESULTS/$MODEL_NAME/$(basename $f .pt)_seed$SEED.pt; done
+    echo "시드 $SEED 결과 저장: $RESULTS/$MODEL_NAME"; exit 0
+  fi; }
 [[ $STAGE == viz || $STAGE == recon || $STAGE == all ]] && { cp -r $ROOT/src/evals/$MODEL_NAME $RESULTS/ 2>/dev/null || true; $PY $SCRIPTS/viz.py; }   # 결과 복사를 먼저(viz가 실패해도 결과는 NAS에 남김)
 echo "== 끝 $(date)"
