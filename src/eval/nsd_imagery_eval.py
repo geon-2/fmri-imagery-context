@@ -175,12 +175,16 @@ def main():
         s = summarize(r); lines.append(f"| {n} (2-way −1 제거) | | " + " | ".join(f"{s.get(c + '|corrected', s[c]):.3f}" for c in cols) + " |")
     if a.paper:
         r = allres[a.paper]; rng = np.random.default_rng(0); idx = rng.integers(0, N_GT, size=(a.bootstrap, N_GT)); n_in = 0; n_all = 0
-        lines += ["", f"논문 Table 1(MIRAGE imagery)과 비교: `{a.paper}`의 95% 구간(자극 {N_GT}개 복원추출 {a.bootstrap}회, 자극 변동만 반영)", "| 지표 | 우리 평균 | 95% 구간 | 논문 | 구간 안? |", "|---|---|---|---|---|"]
+        REL_TOL = 0.15   # docs/mirage_repro_criteria.md 판정 규칙 1(상대 차이 15% 이내)
+        n_rel = 0
+        lines += ["", f"논문 Table 1(MIRAGE imagery)과 비교: `{a.paper}`의 95% 구간(자극 {N_GT}개 복원추출 {a.bootstrap}회, 자극 변동만 반영)", "| 지표 | 우리 평균 | 95% 구간 | 논문 | 구간 안? | 상대 차이 | 15% 이내? |", "|---|---|---|---|---|---|---|"]
         for c in cols:
             if c not in PAPER_TABLE1_IMAGERY: continue
             v = r[c].mean(1); bs = v[idx].mean(1); lo, hi = np.percentile(bs, 2.5), np.percentile(bs, 97.5); pv = PAPER_TABLE1_IMAGERY[c]; ok = lo <= pv <= hi
-            n_in += ok; n_all += 1; lines.append(f"| {c} | {v.mean():.3f} | [{lo:.3f}, {hi:.3f}] | {pv:.3f} | {'예' if ok else '아니오'} |")
-        lines.append(f"\n구간 안에 든 지표: {n_in}/{n_all}")
+            rel = (v.mean() - pv) / pv; within = abs(rel) <= REL_TOL; n_rel += within
+            n_in += ok; n_all += 1; lines.append(f"| {c} | {v.mean():.3f} | [{lo:.3f}, {hi:.3f}] | {pv:.3f} | {'예' if ok else '아니오'} | {rel:+.1%} | {'예' if within else '아니오'} |")
+        need = int(np.ceil(0.75 * n_all))
+        lines.append(f"\n상대 차이 15% 이내: {n_rel}/{n_all} (필요 {need}개 이상, 주 규칙). 95% 구간 안: {n_in}/{n_all} (참고, 구분력이 약함)")
     if a.baseline:
         lines += ["", f"기준 `{a.baseline}` 대비 차이(official, 95% 구간, 자극 {N_GT}개 복원추출 {a.bootstrap}회):"]
         for n, r in allres.items():
