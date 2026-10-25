@@ -32,8 +32,12 @@ HIGHER_BETTER = ["PixCorr", "SSIM", "Alex(2)", "Alex(5)", "Incep", "CLIP"]
 LOWER_BETTER = ["EffNet-B", "SwAV"]
 
 
+ANTIALIAS = True   # 공식 노트북은 torchvision transforms.Resize의 기본값을 쓴다. 최신 torchvision은 텐서에서 antialias=True가 기본(0.17부터).
+                   # 논문 저자 환경의 torchvision 버전은 알 수 없어, 값 차이를 보려면 --antialias false로 다시 계산해 볼 수 있다.
+
+
 def resize(x, s):
-    return F.interpolate(x, size=(s, s), mode="bilinear", antialias=False, align_corners=False)
+    return transforms.functional.resize(x, [s, s], interpolation=transforms.InterpolationMode.BILINEAR, antialias=ANTIALIAS)
 
 
 class Extractors:
@@ -145,7 +149,10 @@ def main():
     ap.add_argument("--out", default=None, help="결과 폴더(CSV, JSON, markdown)")
     ap.add_argument("--no-swav", action="store_true")
     ap.add_argument("--bootstrap", type=int, default=5000)
+    ap.add_argument("--antialias", choices=["true", "false"], default="true", help="리사이즈 antialias(공식 노트북은 torchvision 기본값)")
     a = ap.parse_args()
+    global ANTIALIAS
+    ANTIALIAS = a.antialias == "true"
     ex = Extractors(with_swav=not a.no_swav); gt = load_gt(a.gt)
     allres = {}
     for spec in a.recons:
