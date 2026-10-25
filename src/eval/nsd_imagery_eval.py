@@ -28,6 +28,8 @@ from scipy.spatial.distance import correlation as corr_dist
 N_GT = 12
 IMN = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 CLIP_NORM = transforms.Normalize([0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711])
+# 논문 Table 1, MIRAGE, Mental Imagery Reconstructions (simple + complex). 2-way는 0~1 비율로 환산.
+PAPER_TABLE1_IMAGERY = {"PixCorr": 0.104, "SSIM": 0.398, "Alex(2)": 0.6392, "Alex(5)": 0.6246, "Incep": 0.5225, "CLIP": 0.5746, "EffNet-B": 0.914, "SwAV": 0.575}
 HIGHER_BETTER = ["PixCorr", "SSIM", "Alex(2)", "Alex(5)", "Incep", "CLIP"]
 LOWER_BETTER = ["EffNet-B", "SwAV"]
 
@@ -148,6 +150,8 @@ def main():
     ap.add_argument("--baseline", default=None, help="차이 구간의 기준 방법 이름")
     ap.add_argument("--out", default=None, help="결과 폴더(CSV, JSON, markdown)")
     ap.add_argument("--no-swav", action="store_true")
+    ap.add_argument("--combine", nargs="*", default=[], help="이름=방법1,방법2,... : 방법별(예: 피험자별) 자극 평균을 다시 평균해 합친 항목을 추가")
+    ap.add_argument("--paper", default=None, help="논문 Table 1(MIRAGE imagery)과 비교할 항목 이름. 95% 구간 안에 논문 값이 들어가는지 표시")
     ap.add_argument("--bootstrap", type=int, default=5000)
     ap.add_argument("--antialias", choices=["true", "false"], default="true", help="리사이즈 antialias(공식 노트북은 torchvision 기본값)")
     a = ap.parse_args()
@@ -160,12 +164,23 @@ def main():
         rec = load_recons(files.split(","))
         print(f"[{name}] 반복 {rec.shape[1]}개, 재구성 {tuple(rec.shape)}", flush=True)
         allres[name] = evaluate(ex, gt, rec)
+    for spec in a.combine:
+        name, members = spec.split("=", 1); members = members.split(",")
+        allres[name] = {k: np.mean([allres[m][k].mean(1, keepdims=True) for m in members], axis=0) for k in allres[members[0]]}
     cols = [c for c in HIGHER_BETTER + LOWER_BETTER if all(c in r for r in allres.values())]
     lines = ["| 방법 | 반복 | " + " | ".join(cols) + " |", "|---|---|" + "---|" * len(cols)]
     for n, r in allres.items():
         s = summarize(r); lines.append(f"| {n} (official) | {next(iter(r.values())).shape[1]} | " + " | ".join(f"{s[c]:.3f}" for c in cols) + " |")
     for n, r in allres.items():   # corrected 행
         s = summarize(r); lines.append(f"| {n} (2-way −1 제거) | | " + " | ".join(f"{s.get(c + '|corrected', s[c]):.3f}" for c in cols) + " |")
+    if a.paper:
+        r = allres[a.paper]; rng = np.random.default_rng(0); idx = rng.integers(0, N_GT, size=(a.bootstrap, N_GT)); n_in = 0; n_all = 0
+        lines += ["", f"논문 Table 1(MIRAGE imagery)과 비교: `{a.paper}`의 95% 구간(자극 {N_GT}개 복원추출 {a.bootstrap}회, 자극 변동만 반영)", "| 지표 | 우리 평균 | 95% 구간 | 논문 | 구간 안? |", "|---|---|---|---|---|"]
+        for c in cols:
+            if c not in PAPER_TABLE1_IMAGERY: continue
+            v = r[c].mean(1); bs = v[idx].mean(1); lo, hi = np.percentile(bs, 2.5), np.percentile(bs, 97.5); pv = PAPER_TABLE1_IMAGERY[c]; ok = lo <= pv <= hi
+            n_in += ok; n_all += 1; lines.append(f"| {c} | {v.mean():.3f} | [{lo:.3f}, {hi:.3f}] | {pv:.3f} | {'예' if ok else '아니오'} |")
+        lines.append(f"\n구간 안에 든 지표: {n_in}/{n_all}")
     if a.baseline:
         lines += ["", f"기준 `{a.baseline}` 대비 차이(official, 95% 구간, 자극 {N_GT}개 복원추출 {a.bootstrap}회):"]
         for n, r in allres.items():
