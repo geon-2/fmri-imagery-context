@@ -28,6 +28,31 @@ def run_nb(path,out):
                         print(f"❌ 첫 오류: 셀 {i}\n"+"".join(c["source"])[:800]); print("---\n"+o["ename"]+": "+o["evalue"][:600]); print("\n".join(o["traceback"])[-2500:])
         print("오류 셀 수:",bad)
     return bad if os.path.exists(outp) else (r.returncode or 1)
+STATS_HELPER = r'''
+# [stats] 학습 임베딩 전체(40세션 retrieval이면 약 27GB)를 저장하는 대신, recon이 쓰는 평균/표준편차만 저장한다.
+# recon은 torch.mean/torch.std(axis=0)만 쓴다. 표본 2개 x1=mean+std/sqrt2, x2=mean-std/sqrt2 는 평균과 불편 표준편차가 원본과 같다.
+def _save_stats(t, path):
+    import torch
+    n = t.shape[0]; s = torch.zeros(t.shape[1:], dtype=torch.float64); ss = torch.zeros_like(s)
+    for i in range(0, n, 1000):
+        c = t[i:i + 1000].double(); s += c.sum(0); ss += (c * c).sum(0)
+    mean = s / n; std = ((ss - n * mean * mean) / (n - 1)).clamp_min(0).sqrt(); d = std / (2 ** 0.5)
+    torch.save(torch.stack([mean + d, mean - d]).float(), path.replace("_embeddings_train_", "_embeddings_stats_"))
+'''
+def use_stats_embeddings(nb_path):
+    nb = json.load(open(nb_path)); hit = 0
+    reps = [("torch.save(clip_image_train, file_path)", "_save_stats(clip_image_train, file_path)"),
+            ("torch.save(clip_text_train, file_path_txt)", "_save_stats(clip_text_train, file_path_txt)"),
+            ("torch.save(vae_image_train, file_path)", "_save_stats(vae_image_train, file_path)"),
+            ("torch.save(retrieval_image_train, file_path)", "_save_stats(retrieval_image_train, file_path)")]
+    for c in nb["cells"]:
+        t = "".join(c["source"])
+        if c["cell_type"] == "code" and "Generating Image embeddings!" in t:
+            for a, b in reps:
+                assert t.count(a) == 1, f"저장 호출을 찾지 못함: {a}"; t = t.replace(a, b)
+            c["source"] = (STATS_HELPER + t).splitlines(keepends=True); hit += 1
+    assert hit == 1, f"임베딩 셀을 찾지 못함({hit})"
+    json.dump(nb, open(nb_path, "w")); print("임베딩을 통계 파일로 저장하도록 패치")
 LEAN_CELL = r'''
 # [lean ridge] 원본 릿지 셀을 메모리 절약 구현으로 교체(수식은 sklearn Ridge와 같음. scripts/mirage_server/lean_ridge.py)
 import sys, os, gc, pickle, time
@@ -62,6 +87,7 @@ if which=="train":
     args=(f"--data_path=../dataset/ --cache_dir=../cache/ --model_name={MODEL} --subj={SUBJ} --num_sessions={NS} --caption_type {os.environ['CAPTION_TYPE']} "+" ".join(common))
     patch_notebook(f"{SRC}/Train.ipynb",f"{SRC}/Train_srv.ipynb",args)
     if os.environ.get("LEAN_RIDGE")=="1": use_lean_ridge(f"{SRC}/Train_srv.ipynb")
+    if os.environ.get("STATS_EMB","1")=="1": use_stats_embeddings(f"{SRC}/Train_srv.ipynb")
     rc=run_nb("Train_srv.ipynb","Train_srv_out.ipynb")
 else:
     args=(f"--data_path=../dataset --cache_dir=../cache --model_name={MODEL} --subj={SUBJ} --mode imagery --gen_rep={os.environ['GEN_REP']} "

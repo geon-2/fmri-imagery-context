@@ -31,4 +31,5 @@ fi
     echo "시드 $SEED 결과 저장: $RESULTS/$MODEL_NAME"; exit 0
   fi; }
 [[ $STAGE == viz || $STAGE == recon || $STAGE == all ]] && { cp -r $ROOT/src/evals/$MODEL_NAME $RESULTS/ 2>/dev/null || true; $PY $SCRIPTS/viz.py; }   # 결과 복사를 먼저(viz가 실패해도 결과는 NAS에 남김)
+[[ $STAGE == pipeline ]] && bash $SCRIPTS/04_pipeline.sh
 echo "== 끝 $(date)"
