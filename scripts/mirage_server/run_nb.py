@@ -82,6 +82,35 @@ def use_lean_ridge(nb_path):
             c["source"] = LEAN_CELL.strip().splitlines(keepends=True); hit += 1
     assert hit == 1, f"릿지 셀을 찾지 못함({hit})"
     json.dump(nb, open(nb_path, "w")); print("lean ridge 셀로 교체")
+CTX_CELL = r'''
+# [ctx blend] 맥락 릿지(ridge_ctx_weights.pkl)의 예측을 LLaVA 텍스트 예측(pred_clip_text)과 임베딩 공간에서 가중 평균한다.
+# pred = (1-a)*LLaVA + a*ctx. 맥락 예측도 원본 텍스트 예측과 똑같이 테스트 표본끼리 표준화한 뒤 학습 평균·표준편차로 재스케일한다.
+# 실패하면 LLaVA만 쓴 결과가 다른 조건 이름으로 저장되고 생성에 몇 시간을 쓰게 되므로, 예외가 나면 커널을 즉시 종료해 작업을 바로 실패시킨다.
+try:
+    import pickle, os, torch
+    from sklearn.linear_model import Ridge as _R
+    _w = pickle.load(open(os.environ["CTX_WEIGHTS"], "rb"))
+    _m = _R(alpha=100000, max_iter=50000, random_state=42); _m.coef_ = _w["coef"]; _m.intercept_ = _w["intercept"]
+    pred_ctx = torch.from_numpy(_m.predict(voxels[:,0]).reshape(-1, clip_text_seq_dim, clip_text_emb_dim)); del _w, _m
+    _st = torch.load(os.environ["CTX_STATS"])
+    if normalize_preds:
+        pred_ctx = (pred_ctx - torch.mean(pred_ctx,axis=0)) / (torch.std(pred_ctx,axis=0) + 1e-6) * torch.std(_st,axis=0) + torch.mean(_st,axis=0)
+    _a = float(os.environ["CTX_ALPHA"]); assert 0.0 <= _a <= 1.0 and dual_guidance
+    _before = pred_clip_text.clone()
+    pred_clip_text = (1 - _a) * pred_clip_text + _a * pred_ctx
+    assert pred_clip_text.shape == _before.shape and torch.isfinite(pred_clip_text).all(), "맥락 합치기 결과가 비정상"
+    _cos = torch.nn.functional.cosine_similarity(_before.reshape(len(_before),-1), pred_ctx.reshape(len(pred_ctx),-1), dim=1)
+    print(f"[ctx blend] alpha={_a} pred_ctx{tuple(pred_ctx.shape)} LLaVA-ctx 코사인(자극별 평균) {_cos.mean():.4f}, 합친 뒤 LLaVA 대비 변화 {(pred_clip_text-_before).norm()/_before.norm():.4f}", flush=True)
+    del _before, pred_ctx, _st
+except BaseException:
+    import traceback, os, sys
+    traceback.print_exc(); sys.stdout.flush(); sys.stderr.flush(); os._exit(3)
+'''
+def use_ctx_blend(nb_path):
+    nb = json.load(open(nb_path)); idx = [i for i, c in enumerate(nb["cells"]) if c["cell_type"] == "code" and "std_pred_clip_text" in "".join(c["source"])]
+    assert len(idx) == 1, f"텍스트 예측 정규화 셀을 찾지 못함({len(idx)})"
+    cell = {"cell_type": "code", "execution_count": None, "id": "ctxblend01", "metadata": {}, "outputs": [], "source": CTX_CELL.strip().splitlines(keepends=True)}
+    nb["cells"].insert(idx[0] + 1, cell); json.dump(nb, open(nb_path, "w")); print("맥락 합치기 셀 삽입(셀", idx[0] + 1, ")")
 which=sys.argv[1]
 if which=="train":
     args=(f"--data_path=../dataset/ --cache_dir=../cache/ --model_name={MODEL} --subj={SUBJ} --num_sessions={NS} --caption_type {os.environ['CAPTION_TYPE']} "+" ".join(common))
@@ -101,5 +130,6 @@ else:
             t=t.replace("num_images_per_sample // 8",f"num_images_per_sample // {BS}").replace("min(8, num_images_per_sample)",f"{BS}")
             c["source"]=t.splitlines(keepends=True); hit+=1
     assert hit==1, f"생성 셀을 찾지 못함({hit})"; json.dump(nb,open(f"{SRC}/recon_srv.ipynb","w")); print("recon 배치 크기:",BS)
+    if os.environ.get("CTX_WEIGHTS"): use_ctx_blend(f"{SRC}/recon_srv.ipynb")   # 맥락 릿지를 합치는 조건(CTX_WEIGHTS, CTX_STATS, CTX_ALPHA)
     rc=run_nb("recon_srv.ipynb","recon_srv_out.ipynb")
 print("오류 셀 수(rc):",rc); sys.exit(1 if rc else 0)
