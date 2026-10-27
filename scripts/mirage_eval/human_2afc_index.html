@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NSD-Imagery 2AFC 평가</title>
+<style>
+:root{--bg:#f4f4f2;--fg:#1c1c1a;--mut:#6b6b66;--card:#fff;--line:#d6d6d0;--acc:#2a6df4;--ok:#1f8a4c}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--fg:#ececea;--mut:#9a9a94;--card:#222220;--line:#3a3a36;--acc:#6b9bff;--ok:#4cc27f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,"Apple SD Gothic Neo",sans-serif}
+main{max-width:960px;margin:0 auto;padding:10px 16px}
+.top{display:flex;justify-content:space-between;align-items:center;color:var(--mut);font-size:14px}
+.bar{height:6px;background:var(--line);border-radius:3px;margin:6px 0 14px}.bar i{display:block;height:100%;background:var(--acc);border-radius:3px}
+h1{font-size:16px;margin:0 0 8px;text-align:center}
+.ref{text-align:center;margin-bottom:12px}.ref img{height:min(26vh,300px);width:auto;border:2px solid var(--fg);border-radius:6px}
+.ref div{color:var(--mut);font-size:13px;margin-top:4px}
+.cands{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{background:var(--card);border:3px solid var(--line);border-radius:10px;padding:8px;cursor:pointer;text-align:center;font:inherit;color:inherit}
+.card:hover{border-color:var(--mut)}.card.sel{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 30%,transparent)}
+.card img{height:min(38vh,420px);max-width:100%;width:auto;display:block;margin:0 auto;border-radius:6px}.card b{display:block;margin-top:4px}
+.actions{display:flex;gap:10px;justify-content:center;margin-top:10px}
+button.act{font:inherit;padding:10px 26px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+button.act.go{background:var(--ok);border-color:var(--ok);color:#fff;font-weight:600}
+button.act:disabled{opacity:.4;cursor:not-allowed}
+.hint{text-align:center;color:var(--mut);font-size:13px;margin-top:6px}
+.done{text-align:center;padding:60px 0}
+</style></head><body><main id="app"></main>
+<script src="trials.js"></script>
+<script>
+const T = window.TRIALS, app = document.getElementById("app");
+let resp = {}, idx = 0, sel = null, t0 = 0, lock = 0, busy = false;
+const $ = (h) => { const d = document.createElement("div"); d.innerHTML = h.trim(); return d.firstChild; };
+
+async function init() {
+  try { resp = await (await fetch("/responses")).json(); } catch (e) { app.textContent = "서버에 연결할 수 없습니다."; return; }
+  idx = T.findIndex(t => !resp[t.id]); if (idx < 0) idx = T.length;
+  render();
+}
+function render() {
+  sel = null;
+  if (idx >= T.length) {
+    app.innerHTML = `<div class="done"><h1>모든 문항을 마쳤습니다. 수고하셨습니다.</h1><p>응답은 이미 저장되었습니다. 이 창을 닫으셔도 됩니다.</p>
+      <div class="actions"><button class="act" id="back">← 마지막 문항 수정</button></div></div>`;
+    document.getElementById("back").onclick = () => { idx = T.length - 1; render(); }; return;
+  }
+  const t = T[idx], prev = resp[t.id];
+  app.innerHTML = `
+    <div class="top"><span>${idx + 1} / ${T.length}</span><span>← → 선택 · Enter 확인</span></div>
+    <div class="bar"><i style="width:${(idx / T.length) * 100}%"></i></div>
+    <h1>위 기준 이미지와 더 비슷한 쪽을 고르세요</h1>
+    <div class="ref"><img src="img/${t.ref}"><div>기준 이미지</div></div>
+    <div class="cands">
+      <button class="card" data-s="L"><img src="img/${t.L}"><b>왼쪽</b></button>
+      <button class="card" data-s="R"><img src="img/${t.R}"><b>오른쪽</b></button></div>
+    <div class="actions"><button class="act" id="prev" ${idx === 0 ? "disabled" : ""}>← 이전 문항</button>
+      <button class="act go" id="ok" disabled>확인</button></div>
+    <div class="hint" id="hint">${prev ? "이 문항은 이미 응답했습니다(수정하려면 다시 고르고 확인)." : "후보를 클릭해 고른 뒤 ‘확인’을 누르면 저장됩니다."}</div>`;
+  app.querySelectorAll(".card").forEach(c => c.onclick = () => choose(c.dataset.s));
+  document.getElementById("ok").onclick = confirm_; document.getElementById("prev").onclick = () => { idx--; render(); };
+  if (prev) choose(prev.choice);
+  t0 = performance.now(); lock = performance.now() + 250;
+  const n = T[idx + 1]; if (n) for (const k of ["ref", "L", "R"]) new Image().src = "img/" + n[k];
+}
+function choose(s) {
+  sel = s; app.querySelectorAll(".card").forEach(c => c.classList.toggle("sel", c.dataset.s === s));
+  document.getElementById("ok").disabled = false;
+  document.getElementById("hint").textContent = `${s === "L" ? "왼쪽" : "오른쪽"}을 골랐습니다. 맞으면 ‘확인’, 바꾸려면 다른 쪽을 클릭하세요.`;
+}
+async function confirm_() {
+  if (!sel || busy || performance.now() < lock) return;
+  busy = true;
+  const t = T[idx], btn = document.getElementById("ok"); btn.disabled = true;
+  const body = { id: t.id, choice: sel, rt_ms: Math.round(performance.now() - t0), ts: new Date().toISOString() };
+  try {
+    const r = await fetch("/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) throw 0;
+  } catch (e) { alert("저장에 실패했습니다. 서버가 켜져 있는지 확인하세요."); btn.disabled = false; busy = false; return; }
+  resp[t.id] = body; idx++; busy = false; render();
+}
+document.addEventListener("keydown", e => {
+  if (idx >= T.length) return;
+  if (e.key === "ArrowLeft") choose("L"); else if (e.key === "ArrowRight") choose("R"); else if (e.key === "Enter") confirm_();
+});
+init();
+</script></body></html>
