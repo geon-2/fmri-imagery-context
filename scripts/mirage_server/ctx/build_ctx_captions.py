@@ -1,7 +1,7 @@
 """MIRAGE의 텍스트 가지에 넣을 맥락 문장(T10)을 NSD id별 JSON으로 만든다(맥에서 실행, 서버로 올릴 작은 파일).
 T10 규칙(src/fmri/make_t10_embeddings.py): 맥락 구를 place_type, environment, activity, scale, implied_event, notes 순으로 ", "로 이어 붙이고
 CLIP 토큰이 75를 넘는 첫 구부터 뒤를 버린다. 새 단어를 더하지 않는다. 문장은 CLIP 토큰 기준 75 이하(bigG도 같은 BPE).
-출력: data/results/mirage_ctx/context_T10_by_nsdid.json  ({nsdId(문자열): 문장}), ctx_T10_check.json (검증 요약)
+출력: data/results/mirage_ctx/context_T10_by_nsdid.json  ({nsdId(문자열): 문장}), context_phrases_by_nsdid.json ({nsdId: [구, ...]} 잘림 없음), ctx_T10_check.json (검증 요약)
 검증: (1) 모든 라벨 cocoId가 stim_info에 있고 nsdId가 유일한지, (2) 피험자 1,2,5,7의 비-shared1000 학습 이미지가 전부 포함되는지,
       (3) 토큰 수가 75 이하인지, (4) 원본 COCO 캡션과 나란히 몇 장을 출력해 대응을 눈으로 확인할 수 있게 한다.
 사용(맥, 저장소 루트에서): python3 scripts/mirage_server/ctx/build_ctx_captions.py"""
@@ -11,7 +11,7 @@ import csv
 import numpy as np
 sys.path.insert(0, "src/labeling"); sys.path.insert(0, "src/fmri")
 import text_variants as tv
-from make_t10_embeddings import t10_text, BUDGET, NAME
+from make_t10_embeddings import t10_text, BUDGET, NAME, ORDER
 from transformers import CLIPTokenizer
 
 OUT = Path("data/results/mirage_ctx"); OUT.mkdir(parents=True, exist_ok=True)
@@ -32,13 +32,14 @@ nsd2coco = {int(r["nsdId"]): r["cocoId"] for r in stim}
 tok = CLIPTokenizer.from_pretrained(NAME)
 ntok = lambda s: len(tok(s, add_special_tokens=False).input_ids)
 
-texts, miss, same_as_old = {}, 0, []
+texts, phrases_all, miss, same_as_old = {}, {}, 0, []
 for c in ids:
     n = coco2nsd.get(str(c))
     if n is None: miss += 1; continue
     s, k, tot = t10_text(tv.context_by_dim(lab[c]["labels"]), ntok)
     assert ntok(s) <= BUDGET
     texts[str(n)] = s
+    by = tv.context_by_dim(lab[c]["labels"]); phrases_all[str(n)] = [p for d in ORDER for p in by.get(d, [])]   # 잘림 없는 전체 구(차원 순서)
     if c in old:
         s_old, _, _ = t10_text(tv.context_by_dim(old[c]["labels"]), ntok); same_as_old.append(s == s_old)
 train_need = set()
@@ -58,6 +59,7 @@ for n in list(texts)[:4]:
     ex.append({"nsdId": n, "cocoId": cid, "context_T10": texts[n], "coco_caption": str(cap.get(int(cid), cap.get(cid, "")))[:300]})
 check["examples"] = ex
 json.dump(texts, open(OUT / "context_T10_by_nsdid.json", "w"), ensure_ascii=False)
+json.dump(phrases_all, open(OUT / "context_phrases_by_nsdid.json", "w"), ensure_ascii=False)
 json.dump(check, open(OUT / "ctx_T10_check.json", "w"), ensure_ascii=False, indent=1)
 print(json.dumps({k: v for k, v in check.items() if k != "examples"}, ensure_ascii=False, indent=1))
 for e in ex: print(e)
