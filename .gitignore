@@ -54,3 +54,13 @@ data/embeddings_v2/
 data/stage/
 data/results/
 data/logs/
+
+# 콜랩용 묶음(NSD 파생 캡션·라벨·자극 정보), 에이전트 작업 폴더, 스크립트로 다시 만드는 보고서 파일
+data/colab_bundle/
+_workspace/
+docs/progress_report.docx
+
+# 개인 문서(교수·공동 작업자와의 메일 초안, 캡스톤 신청 문서)는 로컬에만 둔다
+docs/mail_*.md
+docs/capstone/
+docs/capstone_plan_draft.md
