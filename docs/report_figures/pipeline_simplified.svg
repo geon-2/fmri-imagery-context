@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="Apple SD Gothic Neo, AppleGothic, sans-serif">
+<rect width="1600" height="900" fill="#ffffff"/>
+<defs><marker id="a" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#5B6679"/></marker></defs>
+<text x="60" y="64" font-size="38" font-weight="700" fill="#16213A">비교에 사용한 단순화 파이프라인 (텍스트 임베딩 → 뇌 반응 예측)</text>
+<text x="60" y="104" font-size="22" fill="#5B6679">세 텍스트를 같은 절차로 만들고 같은 모델·같은 지표로 비교한다. 이미지 임베딩과의 유사도나 decoding이 아니라 encoding 점수.</text>
+
+<!-- image -->
+<rect x="60" y="210" width="210" height="280" rx="14" fill="#F2F5F9" stroke="#C9D1DD" stroke-width="2"/>
+<text x="165" y="320" font-size="28" font-weight="700" text-anchor="middle" fill="#16213A">NSD 이미지</text>
+<text x="165" y="358" font-size="22" text-anchor="middle" fill="#5B6679">COCO 장면</text>
+<text x="165" y="394" font-size="22" text-anchor="middle" fill="#5B6679">(같은 이미지)</text>
+
+<!-- three texts -->
+<rect x="350" y="150" width="330" height="120" rx="14" fill="#EAF1FF" stroke="#7BA0E8" stroke-width="2"/>
+<text x="515" y="196" font-size="26" font-weight="700" text-anchor="middle" fill="#16213A">① 원본 COCO 캡션</text>
+<text x="515" y="234" font-size="21" text-anchor="middle" fill="#5B6679">캡션 5개 각각</text>
+<rect x="350" y="300" width="330" height="120" rx="14" fill="#EAF1FF" stroke="#7BA0E8" stroke-width="2"/>
+<text x="515" y="346" font-size="26" font-weight="700" text-anchor="middle" fill="#16213A">② 사물 이름</text>
+<text x="515" y="384" font-size="21" text-anchor="middle" fill="#5B6679">COCO 범주명 각각</text>
+<rect x="350" y="450" width="330" height="140" rx="14" fill="#EAF1FF" stroke="#7BA0E8" stroke-width="2"/>
+<text x="515" y="496" font-size="26" font-weight="700" text-anchor="middle" fill="#16213A">③ 맥락 라벨</text>
+<text x="515" y="534" font-size="21" text-anchor="middle" fill="#5B6679">장소·환경·활동·암묵적 사건·</text>
+<text x="515" y="562" font-size="21" text-anchor="middle" fill="#5B6679">공간 규모 등의 구(평균 10.2개)</text>
+
+<path d="M270,350 L350,210" stroke="#5B6679" stroke-width="3" fill="none" marker-end="url(#a)"/>
+<path d="M270,350 L350,360" stroke="#5B6679" stroke-width="3" fill="none" marker-end="url(#a)"/>
+<path d="M270,350 L350,515" stroke="#5B6679" stroke-width="3" fill="none" marker-end="url(#a)"/>
+
+<!-- embed + average -->
+<rect x="770" y="230" width="270" height="240" rx="14" fill="#FFF6E5" stroke="#E0A93B" stroke-width="2"/>
+<text x="905" y="282" font-size="26" font-weight="700" text-anchor="middle" fill="#16213A">단위별 임베딩</text>
+<text x="905" y="322" font-size="21" text-anchor="middle" fill="#5B6679">MPNet (주)</text>
+<text x="905" y="352" font-size="21" text-anchor="middle" fill="#5B6679">CLIP 텍스트 (보조)</text>
+<text x="905" y="402" font-size="24" font-weight="700" text-anchor="middle" fill="#16213A">→ 평균 → 정규화</text>
+<text x="905" y="438" font-size="20" text-anchor="middle" fill="#5B6679">세 텍스트에 동일하게 적용</text>
+<path d="M680,210 L770,320" stroke="#5B6679" stroke-width="3" fill="none" marker-end="url(#a)"/>
+<path d="M680,360 L770,350" stroke="#5B6679" stroke-width="3" fill="none" marker-end="url(#a)"/>
+<path d="M680,520 L770,400" stroke="#5B6679" stroke-width="3" fill="none" marker-end="url(#a)"/>
+
+<!-- ridge -->
+<rect x="1120" y="230" width="270" height="240" rx="14" fill="#EAF7EE" stroke="#4FA36A" stroke-width="2"/>
+<text x="1255" y="282" font-size="26" font-weight="700" text-anchor="middle" fill="#16213A">선형 릿지 회귀</text>
+<text x="1255" y="322" font-size="21" text-anchor="middle" fill="#5B6679">임베딩(768차원)</text>
+<text x="1255" y="352" font-size="21" text-anchor="middle" fill="#5B6679">→ 복셀 반응</text>
+<text x="1255" y="402" font-size="21" text-anchor="middle" fill="#5B6679">복셀별 정규화 선택</text>
+<text x="1255" y="432" font-size="21" text-anchor="middle" fill="#5B6679">5겹 교차검증</text>
+<path d="M1040,350 L1120,350" stroke="#5B6679" stroke-width="3" fill="none" marker-end="url(#a)"/>
+
+<!-- score -->
+<rect x="1120" y="540" width="270" height="130" rx="14" fill="#F3EDFB" stroke="#7B4FD6" stroke-width="2"/>
+<text x="1255" y="590" font-size="26" font-weight="700" text-anchor="middle" fill="#16213A">점수 P</text>
+<text x="1255" y="626" font-size="20" text-anchor="middle" fill="#5B6679">예측과 실제 반응의 상관(복셀별)</text>
+<text x="1255" y="654" font-size="20" text-anchor="middle" fill="#5B6679">중앙값, 고수준 영역 R2·R3 평균</text>
+<path d="M1255,470 L1255,540" stroke="#5B6679" stroke-width="3" fill="none" marker-end="url(#a)"/>
+
+<!-- results -->
+<text x="60" y="672" font-size="26" font-weight="700" fill="#16213A">결과 (MPNet 기준 점수 P)</text>
+<g font-size="22" fill="#16213A">
+<text x="60" y="716">사물 이름만</text><rect x="260" y="698" width="380" height="24" fill="#B8C2D3"/><text x="650" y="716">0.380</text>
+<text x="60" y="760">맥락 라벨</text><rect x="260" y="742" width="439" height="24" fill="#7BA0E8"/><text x="709" y="760">0.439</text>
+<text x="60" y="804">원본 캡션</text><rect x="260" y="786" width="449" height="24" fill="#4F7AD8"/><text x="719" y="804">0.449</text>
+<text x="60" y="848">텍스트를 섞은 대조</text><rect x="260" y="830" width="6" height="24" fill="#E0A93B"/><text x="276" y="848">약 0.004~0.008</text>
+</g>
+<text x="900" y="736" font-size="21" fill="#5B6679">· 캡션이 맥락 라벨보다 약 0.01 높다.</text>
+<text x="900" y="770" font-size="21" fill="#5B6679">· 원인(의미 정보 vs 자연 문장 형식·길이)은 아직 구분하지 못했다.</text>
+<text x="900" y="804" font-size="21" fill="#5B6679">· 다음: 길이를 맞춘 비교, 긴 입력 인코더, 암묵적 사건 예시 점검.</text>
+<text x="900" y="850" font-size="19" fill="#5B6679">막대는 0에서 시작하는 길이(0.1 = 100px).</text>
+</svg>
